@@ -81,8 +81,10 @@ model Problem {
   examples           Json
   constraints        String
   hints              String?
+  editorial          String?
   testcases          Json
   codeSnippets       Json
+  referenceSolutions Json
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -104,6 +106,11 @@ model Submission {
   memory        String?
   time          String?
   createdAt     DateTime         @default(now())
+
+  stdin         String?    
+  stdout        String?    
+  stderr        String?   
+  compileOutput String? 
 
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem       Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
@@ -131,7 +138,7 @@ model ProblemSolved {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
-  @@index([userId, problemId])
+  @@unique([userId, problemId])
 }
 
 // ==========================================
@@ -273,6 +280,7 @@ model Payment {
 model Playlist {
   id          String              @id @default(uuid())
   name        String
+  description String?
   userId      String
   createdAt   DateTime            @default(now())
 

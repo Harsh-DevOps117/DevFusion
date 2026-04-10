@@ -20,6 +20,12 @@ import routesAuth from "./routes/authRoutes";
 import interviewRoutes from "./routes/interviewRoute";
 import quizAttempt from "./routes/quizAttempt";
 import resumeReviewer from "./routes/resumeReview";
+import routesProblem from "./routes/problemRoutes";
+import routeExecuteCode from "./routes/executeCodeRoutes"
+import routesPlaylist from "./routes/playlistRoutes"
+import routeSubmission from "./routes/submissionRoutes"
+import paymentRoutes from "./routes/paymentRoutes"
+
 import { initSocket } from "./utils/socket";
 
 dotenv.config();
@@ -129,6 +135,12 @@ app.use("/v1", isAuthenticated, quizRoutes);
 app.use("/v1", isAuthenticated, quizAttempt);
 app.use("/v1", isAuthenticated, interviewRoutes);
 app.use("/v1/resume", isAuthenticated, resumeReviewer);
+app.use("/v1",routesProblem)
+app.use("/v1",routeExecuteCode)
+app.use("/v1/playlist",routesPlaylist)
+app.use("/v1",routeSubmission)
+app.use("/v1",isAuthenticated,paymentRoutes)
+
 
 // app.listen(process.env.PORT, () => {
 //   logger.info(`Server is running on port ${process.env.PORT}`);
