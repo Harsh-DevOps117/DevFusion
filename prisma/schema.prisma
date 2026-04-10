@@ -1,0 +1,294 @@
+// ==========================================
+// CONFIGURATION (KEEPING YOUR ORIGINALS)
+// ==========================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum Difficulty {
+  Easy
+  Medium
+  Hard
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum QuestionType {
+  MCQ
+  SHORT_ANSWER
+}
+
+// ==========================================
+// USER & AUTH SYSTEM
+// ==========================================
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  image         String?
+  role          UserRole  @default(USER)
+  password      String
+  plan          Plan      @default(FREE)
+
+  currentStreak Int       @default(0)
+  lastActive    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  problems      Problem[]
+  submissions   Submission[]
+  problemSolved ProblemSolved[]
+  playlists     Playlist[]
+  interviews    Interview[]
+  quizAttempts  QuizAttempt[]
+  payments      Payment[]
+  subscription  Subscription?
+  quizzes       Quiz[]
+
+  @@index([email])
+}
+
+// ==========================================
+// PRACTICE MODULE (Coding)
+// ==========================================
+
+model Problem {
+  id                 String              @id @default(uuid())
+  title              String
+  description        String
+  difficulty         Difficulty
+  tags               String[]
+  userId             String
+  examples           Json
+  constraints        String
+  hints              String?
+  testcases          Json
+  codeSnippets       Json
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions        Submission[]
+  solvedBy           ProblemSolved[]
+  problemsPlaylists  ProblemInPlaylist[]
+
+  @@index([difficulty])
+}
+
+model Submission {
+  id            String           @id @default(uuid())
+  userId        String
+  problemId     String
+  sourceCode    String
+  language      String
+  status        String
+  memory        String?
+  time          String?
+  createdAt     DateTime         @default(now())
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem       Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  testResults   TestCaseResult[]
+
+  @@index([userId, problemId])
+}
+
+model TestCaseResult {
+  id           String     @id @default(uuid())
+  submissionId String
+  passed       Boolean
+  stdout       String?
+  expected     String?
+  status       String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model ProblemSolved {
+  id        String   @id @default(uuid())
+  userId    String
+  problemId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, problemId])
+}
+
+// ==========================================
+// AI INTERVIEW MODULE
+// ==========================================
+
+model Interview {
+  id          String   @id @default(uuid())
+  userId      String
+  role        String
+
+  // Adaptive Difficulty: Level 1 to 5
+  currentLevel Int      @default(1)
+
+  totalScore  Int?
+  feedback    String?
+  status      String   @default("IN_PROGRESS")
+  createdAt   DateTime @default(now())
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    InterviewChat[]
+
+  @@index([userId])
+}
+
+model InterviewChat {
+  id          String   @id @default(uuid())
+  interviewId String
+
+  // Topic Extraction for "Weak Area" Dashboard
+  topic       String?
+
+  question    String
+  answer      String?  @db.Text
+  feedback    String?
+  score       Int?     // 1-10
+  createdAt   DateTime @default(now())
+
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// AI QUIZ & LEADERBOARD
+// ==========================================
+
+model Quiz {
+  id          String         @id @default(uuid())
+  userId      String
+  topic       String
+  difficulty  Difficulty
+  createdAt   DateTime       @default(now())
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions   QuizQuestion[]
+  attempts    QuizAttempt[]
+
+  @@index([userId])
+}
+
+model QuizQuestion {
+  id            String       @id @default(uuid())
+  quizId        String
+  type          QuestionType @default(MCQ)
+  question      String
+  options       Json?
+  correctAnswer String
+  explanation   String?
+  order         Int
+
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers       QuizAnswer[]
+
+  @@unique([quizId, order])
+  @@index([quizId, order])
+}
+
+model QuizAttempt {
+  id             String       @id @default(uuid())
+  userId         String
+  quizId         String
+  attemptNumber  Int
+  score          Float
+  totalQuestions Int
+  completedAt    DateTime     @default(now())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz           Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers        QuizAnswer[]
+
+  @@index([userId, quizId])
+}
+
+model QuizAnswer {
+  id         String      @id @default(uuid())
+  attemptId  String
+  questionId String
+  selected   String
+  isCorrect  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
+
+// ==========================================
+// PAYMENTS & SUBSCRIPTIONS
+// ==========================================
+
+model Subscription {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  stripeCustomerId String?  @unique
+  plan             Plan     @default(FREE)
+  isActive         Boolean  @default(true)
+  startDate        DateTime @default(now())
+  endDate          DateTime?
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  userId        String
+  amount        Float
+  currency      String   @default("INR")
+  status        String
+  providerId    String   @unique
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// PLAYLISTS (Collections)
+// ==========================================
+
+model Playlist {
+  id          String              @id @default(uuid())
+  name        String
+  userId      String
+  createdAt   DateTime            @default(now())
+
+  problems    ProblemInPlaylist[]
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([name, userId])
+}
+
+model ProblemInPlaylist {
+  id         String   @id @default(uuid())
+  playlistId String
+  problemId  String
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, problemId])
+}
