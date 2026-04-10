@@ -107,10 +107,10 @@ model Submission {
   time          String?
   createdAt     DateTime         @default(now())
 
-  stdin         String?    
-  stdout        String?    
-  stderr        String?   
-  compileOutput String? 
+  stdin         String?    //changed
+  stdout        String?    //changed
+  stderr        String?   //changed
+  compileOutput String? //changed
 
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem       Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
@@ -280,7 +280,7 @@ model Payment {
 model Playlist {
   id          String              @id @default(uuid())
   name        String
-  description String?
+  description String?    //changed
   userId      String
   createdAt   DateTime            @default(now())
 

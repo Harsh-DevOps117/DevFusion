@@ -5,7 +5,113 @@ import type { Request,Response } from "express";
  
 
 export const createProblem = async (req: Request, res: Response) => {
-    const {
+  const {
+    title,
+    description,
+    difficulty,
+    tags,
+    examples,
+    constraints,
+    testcases,
+    codeSnippets,
+    referenceSolutions,
+  } = req.body;
+
+  try {
+    if (!referenceSolutions || Object.keys(referenceSolutions).length === 0) {
+      return res.status(400).json({
+        error: "Reference solutions are required",
+      });
+    }
+
+    if (!testcases || testcases.length === 0) {
+      return res.status(400).json({
+        error: "Testcases are required",
+      });
+    }
+
+    // 🔥 helper functions
+    const normalize = (str: string) =>
+      (str || "").trim().replace(/\r\n/g, "\n");
+
+    const sortLines = (str: string) =>
+      normalize(str)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .sort()
+        .join("\n");
+
+    for (const [language, solutionCode] of Object.entries(referenceSolutions)) {
+      const languageId = getJudge0LanguageId(language);
+
+      if (!languageId) {
+        return res.status(400).json({
+          error: `Language ${language} is not supported`,
+        });
+      }
+
+      const submissions = testcases.map(({ input, output }: any) => ({
+        source_code: solutionCode,
+        language_id: languageId,
+        stdin: input,
+        expected_output: output,
+      }));
+
+      const submissionResults = await submitBatch(submissions);
+
+      if (!submissionResults || submissionResults.length === 0) {
+        return res.status(500).json({
+          error: "Failed to submit to Judge0",
+        });
+      }
+
+      const tokens: string[] = submissionResults.map((res: any) => res.token);
+
+      const results = await pollBatchResults(tokens);
+
+      if (!results || results.length === 0) {
+        return res.status(500).json({
+          error: "No results returned from Judge0",
+        });
+      }
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+
+        if (!result || !result.status) {
+          logger.error("Bad result:", result);
+          continue;
+        }
+
+        const actualRaw = result.stdout || "";
+        const expectedRaw = testcases[i].output || "";
+
+        const actual = normalize(actualRaw);
+        const expected = normalize(expectedRaw);
+
+        const actualSorted = sortLines(actual);
+        const expectedSorted = sortLines(expected);
+
+        if (actualSorted !== expectedSorted) {
+          console.log(" Testcase Failed");
+          console.log("Language:", language);
+          console.log("Input:", testcases[i].input);
+          console.log("Actual:", JSON.stringify(actual));
+          console.log("Expected:", JSON.stringify(expected));
+
+          return res.status(400).json({
+            error: `Testcase ${i + 1} failed`,
+            language,
+            actual,
+            expected,
+          });
+        }
+      }
+    }
+
+    const newProblem = await prisma.problem.create({
+      data: {
         title,
         description,
         difficulty,
@@ -15,104 +121,22 @@ export const createProblem = async (req: Request, res: Response) => {
         testcases,
         codeSnippets,
         referenceSolutions,
-    } = req.body;
+        userId: req.user?.id,
+      },
+    });
 
-    try {
+    return res.status(201).json({
+      success: true,
+      message: "Problem created successfully",
+      problem: newProblem,
+    });
+  } catch (error) {
+    logger.error("Create Problem Error:", error);
 
-        if (!referenceSolutions || Object.keys(referenceSolutions).length === 0) {
-            return res.status(400).json({
-                error: "Reference solutions are required",
-            });
-        }
-
-        if (!testcases || testcases.length === 0) {
-            return res.status(400).json({
-                error: "Testcases are required",
-            });
-        }
-
-
-        for (const [language, solutionCode] of Object.entries(referenceSolutions)) {
-            const languageId = getJudge0LanguageId(language);
-
-            if (!languageId) {
-                return res.status(400).json({
-                    error: `Language ${language} is not supported`,
-                });
-            }
-
-            const submissions = testcases.map(({ input, output }: any) => ({
-                source_code: solutionCode,
-                language_id: languageId,
-                stdin: input,
-                expected_output: output,
-            }));
-
-
-            const submissionResults = await submitBatch(submissions);
-
-            if (!submissionResults || submissionResults.length === 0) {
-                return res.status(500).json({
-                    error: "Failed to submit to Judge0",
-                });
-            }
-
-            const tokens: string[] = submissionResults.map((res: any) => res.token);
-
-
-            const results = await pollBatchResults(tokens);
-
-            if (!results || results.length === 0) {
-                return res.status(500).json({
-                    error: "No results returned from Judge0",
-                });
-            }
-
-
-            for (let i = 0; i < results.length; i++) {
-                const result = results[i];
-
-                if (!result || !result.status) {
-                    logger.error("Bad result:", result);
-                    continue;  
-                }
-
-                if (result.status.id !== 3) {
-                    return res.status(400).json({
-                        error: `Testcase ${i + 1} failed`,
-                    });
-                }
-            }
-        }
-
-
-        const newProblem = await prisma.problem.create({
-            data: {
-                title,
-                description,
-                difficulty,
-                tags,
-                examples,
-                constraints,
-                testcases,
-                codeSnippets,
-                referenceSolutions,
-                userId:req.user?.id,
-            },
-        });
-
-        return res.status(201).json({
-            success: true,
-            message: "Problem created successfully",
-            problem: newProblem,
-        });
-    } catch (error) {
-        logger.error("Create Problem Error:", error);
-
-        return res.status(500).json({
-            error: "Error while creating Problem",
-        });
-    }
+    return res.status(500).json({
+      error: "Error while creating Problem",
+    });
+  }
 };
 
 export const getAllProblems=async (req:Request,res:Response)=>{
