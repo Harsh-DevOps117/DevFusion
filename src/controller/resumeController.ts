@@ -58,15 +58,9 @@ export const startResumeAnalysis = async (req: any, res: Response) => {
   }
 };
 
-/**
- * POLLING CONTROLLER: Checks job status
- */
 export const getAnalysisStatus = async (req: Request, res: Response) => {
   const { jobId } = req.params;
-
-  // Debug: Confirm the request is hitting this controller
   console.log(`Polling status for Job ID: ${jobId}`);
-
   try {
     const job = await resumeQueue.getJob(jobId);
 
