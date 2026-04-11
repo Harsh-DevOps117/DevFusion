@@ -1,8 +1,7 @@
-import { Request, Response } from "express";
 import crypto from "crypto";
+import { Request, Response } from "express";
 import { prisma } from "../utils/prismaAdapter";
 import { razorpayInstance } from "../utils/razorpay";
-import { child } from "winston";
 
 export const createOrder = async (req: Request, res: Response) => {
   try {
@@ -14,25 +13,23 @@ export const createOrder = async (req: Request, res: Response) => {
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
     });
-    
 
-     await prisma.payment.create({
+    await prisma.payment.create({
       data: {
         userId,
-        amount:Number(amount),
+        amount: Number(amount),
         currency: "INR",
         status: "CREATED",
         providerId: order.id,
       },
     });
 
-
     return res.json({
       success: true,
       order,
     });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     return res.status(500).json({
       success: false,
       message: "Order creation failed",
@@ -40,14 +37,10 @@ export const createOrder = async (req: Request, res: Response) => {
   }
 };
 
-
 export const verifyPayment = async (req: Request, res: Response) => {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
 
     const userId = req.user?.id as string;
 
