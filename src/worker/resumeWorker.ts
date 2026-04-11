@@ -1,77 +1,102 @@
 import { Job, Worker } from "bullmq";
+import dotenv from "dotenv";
 import fs from "fs";
 import Redis from "ioredis";
 import OpenAI from "openai";
-import pdf from "pdf-parse";
+import path from "path";
 
-const connection = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  {
-    maxRetriesPerRequest: null,
-  },
-);
+dotenv.config({
+  path: path.resolve(__dirname, "../../.env"),
+});
 
 const openai = new OpenAI();
+const connection = new Redis(
+  process.env.REDIS_URL || "redis://localhost:6379",
+  { maxRetriesPerRequest: null },
+);
 
 export const resumeWorker = new Worker(
   "resume-analysis",
   async (job: Job) => {
-    // 🛡️ Destructure the new intent-based fields
-    const { filePath, fileType, targetRole, intent } = job.data;
-    let extractedText = "";
+    const { filePath, extractedText, targetRole, intent } = job.data;
+
+    const systemPrompt = `
+      You are a high-end ATS (Applicant Tracking System) Expert and Career Strategist.
+      Analyze the resume for the role: "${targetRole}" with intent: "${intent}".
+
+      ### RULES:
+      1. Provide a realistic ATS score (0-100) based on industry standards.
+      2. Suggest 3-5 job titles the user is currently qualified for.
+      3. Return ONLY a JSON object.
+
+      ### OUTPUT EXAMPLE:
+      {
+        "overallScore": 72,
+        "roleMatchPercentage": 65,
+        "pivotAdvice": "Your background in sales is a great asset for client-facing roles, but for a Pivot into Software Engineering, you must emphasize your JavaScript projects over your sales targets.",
+        "missingSkills": ["React Context API", "Node.js Streams", "Docker Containerization"],
+        "actionPlan": ["Complete a full-stack project", "Get AWS Cloud Practitioner certification", "Rewrite summary to focus on technical problem solving"],
+        "suggestedJobTitles": ["Junior Full Stack Developer", "Technical Support Engineer", "Implementation Specialist"],
+        "atsAnalysis": {
+           "formattingScore": 85,
+           "keywordDensity": 40,
+           "sectionClarity": 90,
+           "impactBulletPoints": 55
+        },
+        "industryInsights": "The tech market currently values specialized dev-ops knowledge even in entry-level frontend roles."
+      }
+    `;
 
     try {
-      await job.updateProgress(10);
+      await job.updateProgress(15);
+      let userContent: any[] = [];
 
-      // 📄 Text Extraction
-      if (fileType === "application/pdf") {
-        const dataBuffer = fs.readFileSync(filePath);
-        const pdfData = await pdf(dataBuffer);
-        extractedText = pdfData.text;
+      if (filePath && fs.existsSync(filePath)) {
+        const imageBuffer = fs.readFileSync(filePath);
+        const base64Image = imageBuffer.toString("base64");
+        userContent = [
+          {
+            type: "text",
+            text: "Analyze this resume image based on the provided system instructions.",
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+          },
+        ];
       } else {
-        extractedText = "TEXT_EXTRACTION_STUB"; // You can add Vision OCR here
+        userContent = [
+          {
+            type: "text",
+            text: `Analyze this resume text:\n\n${extractedText}`,
+          },
+        ];
       }
 
-      await job.updateProgress(40);
-
-      // 🧠 AI CONSULTANT PROMPT
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: `You are a Career Strategist. The user wants to ${intent} their career into a ${targetRole} role.
-            Analyze their resume text against this goal.
-            Return ONLY a JSON object:
-            {
-              "overallScore": number,
-              "roleMatchPercentage": number,
-              "missingSkills": string[],
-              "pivotAdvice": string,
-              "actionPlan": string[],
-              "keywordsFound": string[]
-            }`,
-          },
-          {
-            role: "user",
-            content: `Target Role: ${targetRole}\nIntent: ${intent}\n\nResume Content:\n${extractedText}`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
       });
 
-      const analysisResult = JSON.parse(
-        completion.choices[0].message.content || "{}",
-      );
+      const result = JSON.parse(completion.choices[0].message.content || "{}");
 
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
       await job.updateProgress(100);
-      return analysisResult;
+      return result;
     } catch (err: any) {
       if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
       throw err;
     }
   },
-  { connection, concurrency: 5 },
+  {
+    connection,
+    concurrency: 5,
+    removeOnComplete: { count: 50 },
+    removeOnFail: { count: 100 },
+  },
 );
