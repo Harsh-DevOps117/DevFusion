@@ -1,21 +1,20 @@
-import { getLanguageName, pollBatchResults, submitBatch } from "../utils/judge0";
+import type { Request, Response } from "express";
+import {
+  getLanguageName,
+  pollBatchResults,
+  submitBatch,
+} from "../utils/judge0";
 import logger from "../utils/logger";
 import { prisma } from "../utils/prismaAdapter";
-import type { Request,Response } from "express";
 
 export const executeCode = async (req: Request, res: Response) => {
   try {
-    const {
-      source_code,
-      language_id,
-      stdin,
-      expected_outputs,
-      problemId,
-    } = req.body;
+    const { source_code, language_id, stdin, expected_outputs, problemId } =
+      req.body;
 
-    const userId =req.user?.id as string
+    const userId = req.user?.id as string;
 
-     if (
+    if (
       !Array.isArray(stdin) ||
       stdin.length === 0 ||
       !Array.isArray(expected_outputs) ||
@@ -26,28 +25,28 @@ export const executeCode = async (req: Request, res: Response) => {
       });
     }
 
-     const submissions = stdin.map((input) => ({
+    const submissions = stdin.map((input: string) => ({
       source_code,
       language_id,
       stdin: input,
     }));
 
-     const submitResponse = await submitBatch(submissions);
+    const submitResponse = (await submitBatch(submissions)) as {
+      token: string;
+    }[];
 
-    const tokens = submitResponse.map((r: any) => r.token);
+    const tokens = submitResponse.map((r) => r.token);
 
-     const results = await pollBatchResults(tokens);
+    const results = (await pollBatchResults(tokens)) as any[];
 
     console.log("Raw Results:", results);
 
-     let allPassed = true;
+    let allPassed = true;
 
     const detailedResults = results.map((result: any, i: number) => {
-       if (!result || !result.status) {
+      if (!result || !result.status) {
         console.error("Invalid result:", result);
-
         allPassed = false;
-
         return {
           testCase: i + 1,
           passed: false,
@@ -63,7 +62,6 @@ export const executeCode = async (req: Request, res: Response) => {
 
       const stdout = result.stdout?.trim();
       const expected = expected_outputs[i]?.trim();
-
       const passed = stdout === expected;
 
       if (!passed) allPassed = false;
@@ -83,31 +81,31 @@ export const executeCode = async (req: Request, res: Response) => {
 
     console.log("Detailed:", detailedResults);
 
-     const submission = await prisma.submission.create({
+    const submission = await prisma.submission.create({
       data: {
         userId,
         problemId,
         sourceCode: source_code,
         language: getLanguageName(language_id),
         stdin: stdin.join("\n"),
-        stdout: JSON.stringify(detailedResults.map((r:any) => r.stdout)),
-        stderr: detailedResults.some((r:any) => r.stderr)
-          ? JSON.stringify(detailedResults.map((r:any) => r.stderr))
+        stdout: JSON.stringify(detailedResults.map((r) => r.stdout)),
+        stderr: detailedResults.some((r) => r.stderr)
+          ? JSON.stringify(detailedResults.map((r) => r.stderr))
           : null,
-        compileOutput: detailedResults.some((r:any) => r.compile_output)
-          ? JSON.stringify(detailedResults.map((r:any) => r.compile_output))
+        compileOutput: detailedResults.some((r) => r.compile_output)
+          ? JSON.stringify(detailedResults.map((r) => r.compile_output))
           : null,
         status: allPassed ? "Accepted" : "Wrong Answer",
-        memory: detailedResults.some((r:any) => r.memory)
-          ? JSON.stringify(detailedResults.map((r:any) => r.memory))
+        memory: detailedResults.some((r) => r.memory)
+          ? JSON.stringify(detailedResults.map((r) => r.memory))
           : null,
-        time: detailedResults.some((r:any) => r.time)
-          ? JSON.stringify(detailedResults.map((r:any) => r.time))
+        time: detailedResults.some((r) => r.time)
+          ? JSON.stringify(detailedResults.map((r) => r.time))
           : null,
       },
     });
 
-     if (allPassed) {
+    if (allPassed) {
       await prisma.problemSolved.upsert({
         where: {
           userId_problemId: {
@@ -123,7 +121,7 @@ export const executeCode = async (req: Request, res: Response) => {
       });
     }
 
-     const testCaseResults = detailedResults.map((r:any) => ({
+    const testCaseResults = detailedResults.map((r) => ({
       submissionId: submission.id,
       passed: r.passed,
       stdout: r.stdout,
@@ -135,10 +133,10 @@ export const executeCode = async (req: Request, res: Response) => {
       data: testCaseResults,
     });
 
-     const finalSubmission = await prisma.submission.findUnique({
+    const finalSubmission = await prisma.submission.findUnique({
       where: { id: submission.id },
       include: {
-        testResults: true,  
+        testResults: true,
       },
     });
 
@@ -149,7 +147,6 @@ export const executeCode = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error("Execution Error:", error.message);
-
     return res.status(500).json({
       error: "Failed to execute code",
     });

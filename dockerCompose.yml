@@ -43,19 +43,6 @@ services:
     logging:
       driver: none
 
-  worker:
-    build: .
-    container_name: quiz-worker
-    restart: always
-    command: ["node", "dist/worker/mcqGenerationAI.js"]
-    env_file:
-      - .env
-    depends_on:
-      - db
-      - redis
-    networks:
-      - backend
-
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus

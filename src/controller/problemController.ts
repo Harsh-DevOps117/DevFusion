@@ -1,8 +1,11 @@
-import { getJudge0LanguageId, pollBatchResults, submitBatch } from "../utils/judge0";
+import type { Request, Response } from "express";
+import {
+  getJudge0LanguageId,
+  pollBatchResults,
+  submitBatch,
+} from "../utils/judge0";
 import logger from "../utils/logger";
 import { prisma } from "../utils/prismaAdapter";
-import type { Request,Response } from "express";
- 
 
 export const createProblem = async (req: Request, res: Response) => {
   const {
@@ -19,18 +22,18 @@ export const createProblem = async (req: Request, res: Response) => {
 
   try {
     if (!referenceSolutions || Object.keys(referenceSolutions).length === 0) {
-      return res.status(400).json({
-        error: "Reference solutions are required",
-      });
+      return res
+        .status(400)
+        .json({ error: "Reference solutions are required" });
     }
 
-    if (!testcases || testcases.length === 0) {
-      return res.status(400).json({
-        error: "Testcases are required",
-      });
+    // Cast testcases to any[] so .length and .map work under strict mode
+    const tc = testcases as any[];
+
+    if (!tc || tc.length === 0) {
+      return res.status(400).json({ error: "Testcases are required" });
     }
 
-    // 🔥 helper functions
     const normalize = (str: string) =>
       (str || "").trim().replace(/\r\n/g, "\n");
 
@@ -46,34 +49,32 @@ export const createProblem = async (req: Request, res: Response) => {
       const languageId = getJudge0LanguageId(language);
 
       if (!languageId) {
-        return res.status(400).json({
-          error: `Language ${language} is not supported`,
-        });
+        return res
+          .status(400)
+          .json({ error: `Language ${language} is not supported` });
       }
 
-      const submissions = testcases.map(({ input, output }: any) => ({
+      const submissions = tc.map(({ input, output }: any) => ({
         source_code: solutionCode,
         language_id: languageId,
         stdin: input,
         expected_output: output,
       }));
 
-      const submissionResults = await submitBatch(submissions);
+      const submissionResults = (await submitBatch(submissions)) as any[];
 
       if (!submissionResults || submissionResults.length === 0) {
-        return res.status(500).json({
-          error: "Failed to submit to Judge0",
-        });
+        return res.status(500).json({ error: "Failed to submit to Judge0" });
       }
 
-      const tokens: string[] = submissionResults.map((res: any) => res.token);
+      const tokens: string[] = submissionResults.map((r: any) => r.token);
 
-      const results = await pollBatchResults(tokens);
+      const results = (await pollBatchResults(tokens)) as any[];
 
       if (!results || results.length === 0) {
-        return res.status(500).json({
-          error: "No results returned from Judge0",
-        });
+        return res
+          .status(500)
+          .json({ error: "No results returned from Judge0" });
       }
 
       for (let i = 0; i < results.length; i++) {
@@ -85,7 +86,7 @@ export const createProblem = async (req: Request, res: Response) => {
         }
 
         const actualRaw = result.stdout || "";
-        const expectedRaw = testcases[i].output || "";
+        const expectedRaw = tc[i].output || "";
 
         const actual = normalize(actualRaw);
         const expected = normalize(expectedRaw);
@@ -94,9 +95,9 @@ export const createProblem = async (req: Request, res: Response) => {
         const expectedSorted = sortLines(expected);
 
         if (actualSorted !== expectedSorted) {
-          console.log(" Testcase Failed");
+          console.log("Testcase Failed");
           console.log("Language:", language);
-          console.log("Input:", testcases[i].input);
+          console.log("Input:", tc[i].input);
           console.log("Actual:", JSON.stringify(actual));
           console.log("Expected:", JSON.stringify(expected));
 
@@ -110,6 +111,12 @@ export const createProblem = async (req: Request, res: Response) => {
       }
     }
 
+    // Guard userId before passing to Prisma — strict mode won't allow string | undefined
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const newProblem = await prisma.problem.create({
       data: {
         title,
@@ -121,7 +128,7 @@ export const createProblem = async (req: Request, res: Response) => {
         testcases,
         codeSnippets,
         referenceSolutions,
-        userId: req.user?.id,
+        userId,
       },
     });
 
@@ -132,85 +139,70 @@ export const createProblem = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error("Create Problem Error:", error);
-
-    return res.status(500).json({
-      error: "Error while creating Problem",
-    });
+    return res.status(500).json({ error: "Error while creating Problem" });
   }
 };
 
-export const getAllProblems=async (req:Request,res:Response)=>{
-    console.log("hi")
-    try {
-        const problems=await prisma.problem.findMany()
-        if(!problems){
-            return res.status(404).json({
-                error:"No problem found"
-            })
-        }
-        res.status(200).json({
-            success: true,
-            message: "Problems fetched successfully",
-            problems,
-        });
-    } catch (error) {
-        logger.error(error)
-        return res.status(500).json({
-            error:"error while fetching problem"
-        })
-    }
-}
-
-export const getProblemById=async (req:Request,res:Response)=>{
-    const {id}=req.params
-    if(typeof id!="string"){
-        return res.status(400).json({
-            message:"Invalid problem id"
-        })
-    }
-    try {
-        const problem=await prisma.problem.findUnique({
-            where:{
-                id
-            }
-        })
-
-        return res.status(200).json(({
-            success:true,
-            message:"problem fetched",
-            problem
-        }))
-    } catch (error) {
-        logger.error(error)
-        res.status(500).json({
-            error:"error while fetching"
-        })
-    }
-}
-
-export const getAllProblemSolvedByUser = async (req: Request, res: Response) => {
+export const getAllProblems = async (req: Request, res: Response) => {
   try {
+    const problems = await prisma.problem.findMany();
+    if (!problems) {
+      return res.status(404).json({ error: "No problem found" });
+    }
+    res.status(200).json({
+      success: true,
+      message: "Problems fetched successfully",
+      problems,
+    });
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ error: "error while fetching problem" });
+  }
+};
+
+export const getProblemById = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (typeof id !== "string") {
+    return res.status(400).json({ message: "Invalid problem id" });
+  }
+  try {
+    const problem = await prisma.problem.findUnique({ where: { id } });
+    return res.status(200).json({
+      success: true,
+      message: "problem fetched",
+      problem,
+    });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ error: "error while fetching" });
+  }
+};
+
+export const getAllProblemSolvedByUser = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const problems = await prisma.problem.findMany({
       where: {
         solvedBy: {
-          some: {
-            userId: req.user?.id,
-          },
+          some: { userId },
         },
       },
       include: {
         solvedBy: {
-          where: {
-            userId: req.user?.id,
-          },
+          where: { userId },
         },
       },
     });
 
     if (problems.length === 0) {
-      return res.status(404).json({
-        message: "No problem solved yet",
-      });
+      return res.status(404).json({ message: "No problem solved yet" });
     }
 
     res.status(200).json({
@@ -220,8 +212,6 @@ export const getAllProblemSolvedByUser = async (req: Request, res: Response) => 
     });
   } catch (error) {
     logger.error(error);
-    res.status(500).json({
-      error: "failed to fetch problems",
-    });
+    res.status(500).json({ error: "failed to fetch problems" });
   }
 };

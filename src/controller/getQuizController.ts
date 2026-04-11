@@ -17,7 +17,7 @@ const sendResponse = (
 };
 
 export const getQuiz = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const cacheKey = `quiz:${id}`;
 
   try {
@@ -61,9 +61,9 @@ export const getQuiz = async (req: Request, res: Response) => {
   }
 };
 
-export const submitQuiz = async (req: any, res: Response) => {
+export const submitQuiz = async (req: Request, res: Response) => {
   const { quizId, answers } = req.body;
-  const userId = req.user.id;
+  const userId = req.user?.id as string;
 
   try {
     const questions = await prisma.quizQuestion.findMany({
@@ -78,6 +78,7 @@ export const submitQuiz = async (req: any, res: Response) => {
     });
 
     const score = (correctCount / questions.length) * 100;
+
     const result = await prisma.$transaction(async (tx) => {
       const lastAttempt = await tx.quizAttempt.findFirst({
         where: { userId, quizId },
@@ -110,19 +111,17 @@ export const submitQuiz = async (req: any, res: Response) => {
   }
 };
 
-export const getReview = async (req: any, res: Response) => {
+export const getReview = async (req: Request, res: Response) => {
   try {
+    const attemptId = req.params.attemptId as string;
+    const userId = req.user?.id as string;
+
     const review = await prisma.quizAttempt.findFirst({
-      where: {
-        id: req.params.attemptId,
-        userId: req.user.id,
-      },
+      where: { id: attemptId, userId },
       include: {
         quiz: true,
         answers: {
-          include: {
-            question: true,
-          },
+          include: { question: true },
         },
       },
     });
@@ -135,10 +134,13 @@ export const getReview = async (req: any, res: Response) => {
   }
 };
 
-export const getAttempts = async (req: any, res: Response) => {
+export const getAttempts = async (req: Request, res: Response) => {
   try {
+    const quizId = req.params.id as string;
+    const userId = req.user?.id as string;
+
     const attempts = await prisma.quizAttempt.findMany({
-      where: { quizId: req.params.id, userId: req.user.id },
+      where: { quizId, userId },
       orderBy: { completedAt: "desc" },
     });
     return sendResponse(res, 200, true, "History fetched", attempts);

@@ -2,10 +2,7 @@ import { Request, Response } from "express";
 import path from "path";
 import { resumeQueue } from "../queue/resumeQueue";
 
-/**
- * UNIVERSAL CONTROLLER: Handles Image (Multer) or PDF Text (JSON)
- */
-export const startResumeAnalysis = async (req: any, res: Response) => {
+export const startResumeAnalysis = async (req: Request, res: Response) => {
   const file = req.file;
   const { extractedText, targetRole, intent } = req.body;
   const userId = req.user?.id;
@@ -18,9 +15,8 @@ export const startResumeAnalysis = async (req: any, res: Response) => {
   }
 
   try {
-    // Add the job with explicit persistence settings
     const job = await resumeQueue.add(
-      "resume-analysis", // Ensure this matches your worker's task name
+      "resume-analysis",
       {
         userId,
         targetRole,
@@ -30,13 +26,12 @@ export const startResumeAnalysis = async (req: any, res: Response) => {
         fileType: file ? file.mimetype : "application/pdf",
       },
       {
-        // KEEP THE JOB IN REDIS SO WE CAN POLL IT
         removeOnComplete: {
-          age: 3600, // Keep for 1 hour after finishing
-          count: 100, // Keep last 100 jobs
+          age: 3600,
+          count: 100,
         },
         removeOnFail: {
-          age: 86400, // Keep for 24 hours on failure
+          age: 86400,
         },
       },
     );
@@ -59,8 +54,9 @@ export const startResumeAnalysis = async (req: any, res: Response) => {
 };
 
 export const getAnalysisStatus = async (req: Request, res: Response) => {
-  const { jobId } = req.params;
+  const jobId = req.params.jobId as string;
   console.log(`Polling status for Job ID: ${jobId}`);
+
   try {
     const job = await resumeQueue.getJob(jobId);
 

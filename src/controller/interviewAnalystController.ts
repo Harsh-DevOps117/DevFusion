@@ -8,9 +8,7 @@ interface TopicStats {
 }
 
 export const getAnalytics = async (req: Request, res: Response) => {
-  const { interviewId } = req.params;
-
-  // 1. Guard against missing ID
+  const interviewId = req.params.interviewId as string;
   if (!interviewId) {
     return res.status(400).json({ error: "Interview ID is required" });
   }

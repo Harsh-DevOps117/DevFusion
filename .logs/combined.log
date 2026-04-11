@@ -63,3 +63,20 @@
 {"level":"info","message":"User joined interview room: 3ec0c42c-c721-415b-8ad6-d4d235c7b868","service":"[ MAIN ]","timestamp":"2026-04-11T22:28:48.918Z"}
 {"level":"info","message":"User joined interview room: 9f6cac1b-7f27-49b5-82a7-806e25615b41","service":"[ MAIN ]","timestamp":"2026-04-11T22:30:18.937Z"}
 {"level":"info","message":"User joined interview room: 1ec32cb7-c961-4319-afb2-785019d0b3f0","service":"[ MAIN ]","timestamp":"2026-04-11T22:31:00.748Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:19.694Z"}
+{"level":"info","message":"User joined interview room: 1ec32cb7-c961-4319-afb2-785019d0b3f0","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:28.235Z"}
+{"level":"info","message":"User joined interview room: 1ec32cb7-c961-4319-afb2-785019d0b3f0","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:28.236Z"}
+{"level":"info","message":"User joined interview room: 9f6cac1b-7f27-49b5-82a7-806e25615b41","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:34.606Z"}
+{"level":"info","message":"User joined interview room: 9f6cac1b-7f27-49b5-82a7-806e25615b41","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:34.607Z"}
+{"level":"info","message":"User joined interview room: f7961a59-ae10-4b73-99ce-a8d327b4f48c","service":"[ MAIN ]","timestamp":"2026-04-11T22:32:54.473Z"}
+{"level":"info","message":"User joined interview room: 569ae19c-b9d5-4a70-8d78-b8032127d071","service":"[ MAIN ]","timestamp":"2026-04-11T22:36:38.233Z"}
+{"level":"info","message":"User joined interview room: d8bf223f-217f-4777-aab5-ecf22e75ee8f","service":"[ MAIN ]","timestamp":"2026-04-11T22:39:08.538Z"}
+{"level":"info","message":"User joined interview room: 3ec0c42c-c721-415b-8ad6-d4d235c7b868","service":"[ MAIN ]","timestamp":"2026-04-11T22:44:02.231Z"}
+{"level":"info","message":"User joined interview room: 3ec0c42c-c721-415b-8ad6-d4d235c7b868","service":"[ MAIN ]","timestamp":"2026-04-11T22:44:02.234Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:22:44.146Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:23:48.094Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:27:57.640Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:36:03.491Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:36:55.038Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:39:16.330Z"}
+{"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:39:21.475Z"}
