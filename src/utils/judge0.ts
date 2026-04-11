@@ -3,9 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-/* ---------------------------------- */
-/* 🔧 Axios Instance (RapidAPI setup) */
-/* ---------------------------------- */
+ 
 export const judge0 = axios.create({
   baseURL: process.env.JUDGE0_API_URL,
   headers: {
@@ -15,9 +13,7 @@ export const judge0 = axios.create({
   },
 });
 
-/* ---------------------------------- */
-/* 🧠 Types */
-/* ---------------------------------- */
+ 
 type JudgeStatus = {
   id: number;
   description: string;
@@ -38,6 +34,8 @@ export const getJudge0LanguageId = (language: string): number | null => {
     JAVA: 62,
     JAVASCRIPT: 63,
     TYPESCRIPT: 74,
+    RUST: 73,
+    GO: 60,
   };
 
   return languageMap[language.toUpperCase()] ?? null;
@@ -49,6 +47,8 @@ export const getLanguageName = (languageId: number): string => {
     63: "JavaScript",
     71: "Python",
     62: "Java",
+    73: "Rust",
+    60: "Go",
   };
 
   return LANGUAGE_NAMES[languageId] ?? "Unknown";
