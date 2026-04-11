@@ -5,7 +5,7 @@ import type { Application, Request, Response } from "express";
 import express from "express";
 import helmet from "helmet";
 import { isAuthenticated } from "./middleware/authMiddleware";
-
+ 
 import "./worker/interView";
 import "./worker/mcqGenerationAI";
 import "./worker/resumeWorker";
@@ -20,6 +20,12 @@ import routesAuth from "./routes/authRoutes";
 import interviewRoutes from "./routes/interviewRoute";
 import quizAttempt from "./routes/quizAttempt";
 import resumeReviewer from "./routes/resumeReview";
+import routesProblem from "./routes/problemRoutes";
+import routeExecuteCode from "./routes/executeCodeRoutes"
+import routesPlaylist from "./routes/playlistRoutes"
+import routeSubmission from "./routes/submissionRoutes"
+import paymentRoutes from "./routes/paymentRoutes"
+
 import userRoute from "./routes/userRoute";
 
 import getLeaderboard from "./routes/leaderBoard";
@@ -133,6 +139,12 @@ app.use("/v1", isAuthenticated, quizRoutes);
 app.use("/v1", isAuthenticated, quizAttempt);
 app.use("/v1", isAuthenticated, interviewRoutes);
 app.use("/v1/resume", isAuthenticated, resumeReviewer);
+app.use("/v1/problem",isAuthenticated,routesProblem)
+app.use("/v1",isAuthenticated,routeExecuteCode)
+app.use("/v1/playlist",isAuthenticated,routesPlaylist)
+app.use("/v1",isAuthenticated,routeSubmission)
+app.use("/v1",isAuthenticated,paymentRoutes)
+
 app.use("/v1/user", isAuthenticated, userRoute);
 
 // app.listen(process.env.PORT, () => {

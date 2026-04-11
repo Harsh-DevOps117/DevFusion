@@ -175,3 +175,134 @@ export const logout = async (req: Request, res: Response) => {
     message: "Logged out successfully",
   });
 };
+
+
+ 
+export const getAdminStats = async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+ 
+    const [totalUsers, totalProblems, totalSubmissions] = await Promise.all([
+      prisma.user.count(),
+      prisma.problem.count(),
+      prisma.submission.count(),
+    ]);
+
+     
+    const [activeUsers24h, activeUsers7d] = await Promise.all([
+      prisma.user.count({
+        where: { lastActive: { gte: last24h } },
+      }),
+      prisma.user.count({
+        where: { lastActive: { gte: last7d } },
+      }),
+    ]);
+ 
+    const leaderboardRaw = await prisma.problemSolved.groupBy({
+      by: ["userId"],
+      _count: { problemId: true },
+      orderBy: {
+        _count: { problemId: "desc" },
+      },
+      take: 10,
+    });
+
+    const leaderboard = await Promise.all(
+      leaderboardRaw.map(async (entry) => {
+        const user = await prisma.user.findUnique({
+          where: { id: entry.userId },
+          select: { id: true, name: true, email: true },
+        });
+
+        return {
+          user,
+          solved: entry._count.problemId,
+        };
+      })
+    );
+
+     
+    const creatorsRaw = await prisma.problem.groupBy({
+      by: ["userId"],
+      _count: { id: true },
+      orderBy: {
+        _count: { id: "desc" },
+      },
+      take: 10,
+    });
+
+    const topCreators = await Promise.all(
+      creatorsRaw.map(async (entry) => {
+        const user = await prisma.user.findUnique({
+          where: { id: entry.userId },
+          select: { id: true, name: true, email: true },
+        });
+
+        return {
+          user,
+          problemsCreated: entry._count.id,
+        };
+      })
+    );
+
+    
+    const mostAttemptedRaw = await prisma.submission.groupBy({
+      by: ["problemId"],
+      _count: { problemId: true },
+      orderBy: {
+        _count: { problemId: "desc" },
+      },
+      take: 5,
+    });
+
+    const mostAttempted = await Promise.all(
+      mostAttemptedRaw.map(async (entry) => {
+        const problem = await prisma.problem.findUnique({
+          where: { id: entry.problemId },
+          select: { id: true, title: true, difficulty: true },
+        });
+
+        return {
+          problem,
+          attempts: entry._count.problemId,
+        };
+      })
+    );
+
+    
+    const difficultyStats = await prisma.problem.groupBy({
+      by: ["difficulty"],
+      _count: { difficulty: true },
+    });
+
+      
+    const revenue = await prisma.payment.aggregate({
+      _sum: { amount: true },
+    });
+
+     
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        totalProblems,
+        totalSubmissions,
+        activeUsers24h,
+        activeUsers7d,
+        revenue: revenue._sum.amount || 0,
+      },
+      leaderboard,
+      topCreators,
+      mostAttempted,
+      difficultyStats,
+    });
+  } catch (error) {
+    console.error("ADMIN_STATS_ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch admin stats",
+    });
+  }
+};

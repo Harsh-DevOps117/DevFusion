@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Razorpay Test</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+  <h2>Razorpay Test Payment</h2>
+
+  <input type="number" id="amount" placeholder="Enter amount" />
+  <button onclick="payNow()">Pay Now</button>
+
+  <script>
+    async function payNow() {
+      const amount = document.getElementById("amount").value;
+
+      // 1. Create order from backend
+      const res = await fetch("http://localhost:3001/v1/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjNiY2VmMmY4LTNhMTUtNDU4NC05NDI0LTBiYzMwNGUzYTYwYSIsInJvbGUiOiJVU0VSIiwicGxhbiI6IkZSRUUiLCJpYXQiOjE3NzU4NDAyMTgsImV4cCI6MTc3NTg0MTExOH0.zgJPTK7pSDAPYvT9P9vrEAPrp1we40kjpTmDf8K70FI"
+        },
+        body: JSON.stringify({ amount })
+      });
+      
+
+      const data = await res.json();
+      console.log(data)
+
+      if (!data.success) {
+        alert("Order creation failed");
+        return;
+      }
+
+      const order = data.order;
+
+      // 2. Open Razorpay checkout
+      const options = {
+        key: "rzp_test_SbdeoiPyxntZ27", // from dashboard
+        amount: order.amount,
+        currency: order.currency,
+        name: "DevFusion",
+        description: "Test Payment",
+        order_id: order.id,
+
+        handler: async function (response) {
+          // 3. Verify payment
+          const verifyRes = await fetch("http://localhost:5000/api/payment/verify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjNiY2VmMmY4LTNhMTUtNDU4NC05NDI0LTBiYzMwNGUzYTYwYSIsInJvbGUiOiJVU0VSIiwicGxhbiI6IkZSRUUiLCJpYXQiOjE3NzU4NDAyMTgsImV4cCI6MTc3NTg0MTExOH0.zgJPTK7pSDAPYvT9P9vrEAPrp1we40kjpTmDf8K70FI"
+            },
+            body: JSON.stringify(response)
+          });
+
+          const verifyData = await verifyRes.json();
+
+          if (verifyData.success) {
+            alert("✅ Payment Success!");
+          } else {
+            alert("❌ Verification Failed");
+          }
+        },
+
+        theme: {
+          color: "#3399cc"
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+  </script>
+
+</body>
+</html>
