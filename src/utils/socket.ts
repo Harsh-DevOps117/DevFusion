@@ -1,17 +1,19 @@
-import { Server as HttpServer } from "http";
-import { Server } from "socket.io";
+import { Server as HTTPServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
 
-let io: Server;
+let io: SocketIOServer | null = null;
 
-export const initSocket = (httpServer: HttpServer) => {
-  io = new Server(httpServer, {
+export const initSocket = (httpServer: HTTPServer) => {
+  io = new SocketIOServer(httpServer, {
     cors: {
       origin: "http://localhost:5173",
-      methods: ["GET", "POST"],
       credentials: true,
     },
   });
   return io;
 };
 
-export { io };
+// Use a standard function declaration for better compatibility
+export function getIO() {
+  return io;
+}

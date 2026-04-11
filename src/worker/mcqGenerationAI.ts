@@ -63,7 +63,7 @@ Format:
         {
           role: "user",
           content: `
-                Generate a ${difficulty} quiz about ${topic}.
+                Generate a 10 ${difficulty} quiz about ${topic}.
                 Return the response in JSON.
                 The response must be valid JSON with this structure:
 

@@ -6,7 +6,7 @@ import { loginSchema } from "../utils/LoginValidation";
 import { prisma } from "../utils/prismaAdapter";
 import { signupSchema } from "../utils/signupValidation";
 
-// Ensure these match your .env variable names
+// Environment Variables
 const pepper = process.env.PEPPER || "";
 const JWT_SECRET = process.env.JWT_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET;
@@ -23,7 +23,6 @@ const COOKIE_OPTIONS = {
 };
 
 const generateTokens = (userId: string, role: string, plan?: string) => {
-  // We use "id" as the key to stay consistent with Prisma
   const accessToken = jwt.sign({ id: userId, role, plan }, JWT_SECRET, {
     expiresIn: "15m",
   });
@@ -69,6 +68,7 @@ export const signup = async (req: Request, res: Response) => {
     );
 
     res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
+
     return res.status(201).json({
       success: true,
       accessToken,
@@ -76,7 +76,8 @@ export const signup = async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: user.role, // ✅ Role included
+        plan: user.plan,
       },
     });
   } catch (error) {
@@ -103,6 +104,7 @@ export const login = async (req: Request, res: Response) => {
         .json({ success: false, message: "Invalid credentials." });
     }
 
+    // Update last active
     await prisma.user.update({
       where: { id: user.id },
       data: { lastActive: new Date() },
@@ -115,6 +117,7 @@ export const login = async (req: Request, res: Response) => {
     );
 
     res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
+
     return res.json({
       success: true,
       accessToken,
@@ -122,6 +125,7 @@ export const login = async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role, // ✅ Role Added Here
         plan: user.plan,
       },
     });
@@ -138,13 +142,13 @@ export const refresh = async (req: Request, res: Response) => {
   }
 
   try {
-    // FIX: Using { id: string } to match generateTokens payload
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as {
       id: string;
     };
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
+      select: { id: true, role: true, plan: true },
     });
 
     if (!user) return res.status(403).json({ message: "User not found" });
@@ -176,36 +180,27 @@ export const logout = async (req: Request, res: Response) => {
   });
 };
 
-
- 
 export const getAdminStats = async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
- 
+
     const [totalUsers, totalProblems, totalSubmissions] = await Promise.all([
       prisma.user.count(),
       prisma.problem.count(),
       prisma.submission.count(),
     ]);
 
-     
     const [activeUsers24h, activeUsers7d] = await Promise.all([
-      prisma.user.count({
-        where: { lastActive: { gte: last24h } },
-      }),
-      prisma.user.count({
-        where: { lastActive: { gte: last7d } },
-      }),
+      prisma.user.count({ where: { lastActive: { gte: last24h } } }),
+      prisma.user.count({ where: { lastActive: { gte: last7d } } }),
     ]);
- 
+
     const leaderboardRaw = await prisma.problemSolved.groupBy({
       by: ["userId"],
       _count: { problemId: true },
-      orderBy: {
-        _count: { problemId: "desc" },
-      },
+      orderBy: { _count: { problemId: "desc" } },
       take: 10,
     });
 
@@ -213,23 +208,16 @@ export const getAdminStats = async (req: Request, res: Response) => {
       leaderboardRaw.map(async (entry) => {
         const user = await prisma.user.findUnique({
           where: { id: entry.userId },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, role: true },
         });
-
-        return {
-          user,
-          solved: entry._count.problemId,
-        };
-      })
+        return { user, solved: entry._count.problemId };
+      }),
     );
 
-     
     const creatorsRaw = await prisma.problem.groupBy({
       by: ["userId"],
       _count: { id: true },
-      orderBy: {
-        _count: { id: "desc" },
-      },
+      orderBy: { _count: { id: "desc" } },
       take: 10,
     });
 
@@ -237,23 +225,16 @@ export const getAdminStats = async (req: Request, res: Response) => {
       creatorsRaw.map(async (entry) => {
         const user = await prisma.user.findUnique({
           where: { id: entry.userId },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, role: true },
         });
-
-        return {
-          user,
-          problemsCreated: entry._count.id,
-        };
-      })
+        return { user, problemsCreated: entry._count.id };
+      }),
     );
 
-    
     const mostAttemptedRaw = await prisma.submission.groupBy({
       by: ["problemId"],
       _count: { problemId: true },
-      orderBy: {
-        _count: { problemId: "desc" },
-      },
+      orderBy: { _count: { problemId: "desc" } },
       take: 5,
     });
 
@@ -263,26 +244,19 @@ export const getAdminStats = async (req: Request, res: Response) => {
           where: { id: entry.problemId },
           select: { id: true, title: true, difficulty: true },
         });
-
-        return {
-          problem,
-          attempts: entry._count.problemId,
-        };
-      })
+        return { problem, attempts: entry._count.problemId };
+      }),
     );
 
-    
     const difficultyStats = await prisma.problem.groupBy({
       by: ["difficulty"],
       _count: { difficulty: true },
     });
 
-      
     const revenue = await prisma.payment.aggregate({
       _sum: { amount: true },
     });
 
-     
     return res.json({
       success: true,
       stats: {
