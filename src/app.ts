@@ -139,7 +139,7 @@ app.use("/v1", isAuthenticated, quizRoutes);
 app.use("/v1", isAuthenticated, quizAttempt);
 app.use("/v1", isAuthenticated, interviewRoutes);
 app.use("/v1/resume", isAuthenticated, resumeReviewer);
-app.use("/v1",isAuthenticated,routesProblem)
+app.use("/v1/problem",isAuthenticated,routesProblem)
 app.use("/v1",isAuthenticated,routeExecuteCode)
 app.use("/v1/playlist",isAuthenticated,routesPlaylist)
 app.use("/v1",isAuthenticated,routeSubmission)

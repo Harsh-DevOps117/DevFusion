@@ -10,6 +10,7 @@ export const isAuthenticated = async (
 ) => {
   try {
     const secret = process.env.JWT_SECRET;
+    console.log("hit")
 
     if (!secret) {
       console.error("AUTH_ERROR: JWT secrets are missing in .env");
@@ -93,6 +94,7 @@ export const isAuthenticated = async (
 export const authorize = (...allowedRoles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
+       
       return res.status(401).json({
         success: false,
         message: "Not authenticated",
@@ -105,7 +107,7 @@ export const authorize = (...allowedRoles: UserRole[]) => {
         message: "Forbidden: insufficient permissions",
       });
     }
-
+    console.log("user authorized")
     next();
   };
 };
