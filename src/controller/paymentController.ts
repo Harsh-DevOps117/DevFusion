@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import crypto from "crypto";
 import { prisma } from "../utils/prismaAdapter";
 import { razorpayInstance } from "../utils/razorpay";
+import { child } from "winston";
 
 export const createOrder = async (req: Request, res: Response) => {
   try {
@@ -13,22 +14,25 @@ export const createOrder = async (req: Request, res: Response) => {
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
     });
+    
 
      await prisma.payment.create({
       data: {
         userId,
-        amount,
+        amount:Number(amount),
         currency: "INR",
         status: "CREATED",
         providerId: order.id,
       },
     });
 
+
     return res.json({
       success: true,
       order,
     });
   } catch (error) {
+    console.log(error)
     return res.status(500).json({
       success: false,
       message: "Order creation failed",

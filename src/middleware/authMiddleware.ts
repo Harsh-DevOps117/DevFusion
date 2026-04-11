@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { prisma } from "../utils/prismaAdapter";
+import { UserRole } from "../../generated/prisma/enums";
 
 export const isAuthenticated = async (
   req: Request,
@@ -87,3 +88,25 @@ export const isAuthenticated = async (
     });
   }
 };
+
+
+export const authorize = (...allowedRoles: UserRole[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: insufficient permissions",
+      });
+    }
+
+    next();
+  };
+};
+

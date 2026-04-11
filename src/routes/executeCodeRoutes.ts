@@ -5,6 +5,6 @@ import { isAuthenticated } from "../middleware/authMiddleware";
 const router=Router()
 
 
-router.post("/execute-code",isAuthenticated,executeCode)
+router.post("/execute-code",executeCode)
 
 export default router

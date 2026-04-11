@@ -5,7 +5,7 @@ import type { Application, Request, Response } from "express";
 import express from "express";
 import helmet from "helmet";
 import { isAuthenticated } from "./middleware/authMiddleware";
-
+ 
 import "./worker/interView";
 import "./worker/mcqGenerationAI";
 import "./worker/resumeWorker";
@@ -57,7 +57,7 @@ register.registerMetric(httpRequestDuration);
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "http://127.0.0.1:5500",
     credentials: true,
   }),
 );
@@ -135,10 +135,10 @@ app.use("/v1", isAuthenticated, quizRoutes);
 app.use("/v1", isAuthenticated, quizAttempt);
 app.use("/v1", isAuthenticated, interviewRoutes);
 app.use("/v1/resume", isAuthenticated, resumeReviewer);
-app.use("/v1",routesProblem)
-app.use("/v1",routeExecuteCode)
-app.use("/v1/playlist",routesPlaylist)
-app.use("/v1",routeSubmission)
+app.use("/v1",isAuthenticated,routesProblem)
+app.use("/v1",isAuthenticated,routeExecuteCode)
+app.use("/v1/playlist",isAuthenticated,routesPlaylist)
+app.use("/v1",isAuthenticated,routeSubmission)
 app.use("/v1",isAuthenticated,paymentRoutes)
 
 

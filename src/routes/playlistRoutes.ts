@@ -1,15 +1,15 @@
 import { Router } from "express";
 import { addProblemToPlaylist, createPlaylist, deletePlaylist, getPlaylistDetails, removeProblemFromPlayList } from "../controller/playlistController";
-import { isAuthenticated } from "../middleware/authMiddleware";
+import { authorize, isAuthenticated } from "../middleware/authMiddleware";
 
 const routes=Router()
 
 
-routes.get("/",getPlaylistDetails)
-routes.get("/:playlistId",isAuthenticated,getPlaylistDetails)
-routes.post("/create-playlist",isAuthenticated,createPlaylist)
-routes.post("/:playlistId/add-problem",isAuthenticated,addProblemToPlaylist)
-routes.delete("/:playlistId",isAuthenticated,deletePlaylist)
-routes.delete("/:playlistId/remove-problem",isAuthenticated,removeProblemFromPlayList)
+routes.get("/",authorize("USER","ADMIN"),getPlaylistDetails)
+routes.get("/:playlistId",authorize("USER","ADMIN"),getPlaylistDetails)
+routes.post("/create-playlist",authorize("USER","ADMIN"),createPlaylist)
+routes.post("/:playlistId/add-problem",authorize("USER","ADMIN"),addProblemToPlaylist)
+routes.delete("/:playlistId",authorize("USER","ADMIN"),deletePlaylist)
+routes.delete("/:playlistId/remove-problem",authorize("USER","ADMIN"),removeProblemFromPlayList)
 
 export default routes
