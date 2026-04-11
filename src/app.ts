@@ -26,6 +26,9 @@ import routesPlaylist from "./routes/playlistRoutes"
 import routeSubmission from "./routes/submissionRoutes"
 import paymentRoutes from "./routes/paymentRoutes"
 
+import userRoute from "./routes/userRoute";
+
+import getLeaderboard from "./routes/leaderBoard";
 import { initSocket } from "./utils/socket";
 
 dotenv.config();
@@ -131,6 +134,7 @@ io.on("connection", (socket) => {
 });
 
 app.use("/v1", routesAuth);
+app.use("/v1", getLeaderboard);
 app.use("/v1", isAuthenticated, quizRoutes);
 app.use("/v1", isAuthenticated, quizAttempt);
 app.use("/v1", isAuthenticated, interviewRoutes);
@@ -141,6 +145,7 @@ app.use("/v1/playlist",isAuthenticated,routesPlaylist)
 app.use("/v1",isAuthenticated,routeSubmission)
 app.use("/v1",isAuthenticated,paymentRoutes)
 
+app.use("/v1/user", isAuthenticated, userRoute);
 
 // app.listen(process.env.PORT, () => {
 //   logger.info(`Server is running on port ${process.env.PORT}`);
