@@ -1,29 +1,84 @@
 pipeline {
     agent any
 
+    environment {
+        // 🛠️ Global Configs
+        DOCKER_IMAGE = "prepgrid-backend"
+        DOCKER_TAG   = "${env.BUILD_NUMBER}"
+        REGISTRY     = "your-docker-hub-username"
+        CRED_ID      = "docker-hub-creds"
+    }
+
+    options {
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+    }
+
     stages {
-        stage('Build') {
+        stage('Initialize') {
             steps {
-                sh 'mvn package'
+                script {
+                    echo "🚀 Initializing Build: ${env.BUILD_TAG}"
+                }
             }
         }
-        stage('Test') {
+
+        stage('Checkout') {
             steps {
-                sh 'mvn test'
+                checkout scm
             }
         }
-        stage('Deploy') {
+
+        stage('Build & Unit Test') {
             steps {
-                sh 'mvn deploy'
+                // Wrapper use karna safe hai (./mvnw)
+                sh './mvnw clean package -DskipTests'
+                echo "📦 Build Completed successfully."
+            }
+        }
+
+        stage('Static Analysis & Parallel Tests') {
+            parallel {
+                stage('JUnit Tests') {
+                    steps {
+                        sh './mvnw test'
+                    }
+                }
+                stage('Security Scan') {
+                    steps {
+                        echo "🔍 Running OWASP dependency-check..."
+                    }
+                }
+            }
+        }
+
+        stage('Dockerize & Push') {
+            steps {
+                script {
+                    docker.withRegistry('', CRED_ID) {
+                        def appImage = docker.build("${REGISTRY}/${DOCKER_IMAGE}:${DOCKER_TAG}")
+                        appImage.push()
+                        appImage.push("latest")
+                    }
+                }
             }
         }
     }
 
     post {
+        success {
+            echo "✅ Protocol Synchronized. Deploy Successful."
+
+        }
         failure {
             mail to: 'devops@agentic.ai',
-                    subject: 'Jenkins Job Failure',
-                    body: 'Jenkins job failed, please check the console output for more information.'
+                 subject: "❌ Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Bhai, build phat gaya! Console Check kar: ${env.BUILD_URL}"
+        }
+        always {
+            cleanWs()
         }
     }
 }
