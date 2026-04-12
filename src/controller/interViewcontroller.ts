@@ -3,10 +3,7 @@ import { Request, Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
 
-const connection = new Redis({
-  host: process.env.REDIS_HOST || "redis",
-  port: Number(process.env.REDIS_PORT) || 6379,
-});
+const connection = new Redis(process.env.REDIS_URL || "redis://redis:6379");
 
 const interviewQueue = new Queue("interview-queue", { connection });
 

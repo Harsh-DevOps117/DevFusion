@@ -80,3 +80,6 @@
 {"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:36:55.038Z"}
 {"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:39:16.330Z"}
 {"level":"info","message":"Server is running on port 3007","service":"[ MAIN ]","timestamp":"2026-04-11T23:39:21.475Z"}
+{"level":"info","message":"Server is running on port 3001","service":"[ MAIN ]","timestamp":"2026-04-12T01:40:56.869Z"}
+{"level":"info","message":"Server is running on port 3001","service":"[ MAIN ]","timestamp":"2026-04-12T02:09:21.559Z"}
+{"level":"info","message":"Server is running on port 3001","service":"[ MAIN ]","timestamp":"2026-04-12T02:10:00.865Z"}

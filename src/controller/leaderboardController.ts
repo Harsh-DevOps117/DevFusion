@@ -2,10 +2,7 @@ import { Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST || "redis",
-  port: Number(process.env.REDIS_PORT) || 6379,
-});
+const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
 const LEADERBOARD_CACHE_KEY = "leaderboard:top10";
 
 export const getLeaderboard = async (req: any, res: Response) => {

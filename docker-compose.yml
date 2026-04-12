@@ -9,6 +9,7 @@ services:
       - .env
     depends_on:
       - db
+      - redis
     networks:
       - backend
     healthcheck:

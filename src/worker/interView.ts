@@ -385,7 +385,7 @@ recruiting team within 5 business days. Safe travels!",
       });
     }
   },
-  { connection: { host: "localhost", port: 6379, maxRetriesPerRequest: null } },
+  { connection: { host: "redis", port: 6379, maxRetriesPerRequest: null } },
 );
 
 // Error Trackers
