@@ -2,9 +2,8 @@ import { Queue } from "bullmq";
 import Redis from "ioredis";
 
 const connection = new Redis({
-  host: "localhost",
-  port: 6379,
-  maxRetriesPerRequest: null,
+  host: process.env.REDIS_HOST || "redis",
+  port: Number(process.env.REDIS_PORT) || 6379,
 });
 
 export const resumeQueue = new Queue("resume-analysis", {

@@ -2,7 +2,10 @@ import type { Request, Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
 
-const redis = new Redis();
+const redis = new Redis({
+  host: process.env.REDIS_HOST || "redis",
+  port: Number(process.env.REDIS_PORT) || 6379,
+});
 
 const sendResponse = (
   res: Response,

@@ -4,9 +4,8 @@ import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
 
 const connection = new Redis({
-  host: "localhost",
-  port: 6379,
-  maxRetriesPerRequest: null,
+  host: process.env.REDIS_HOST || "redis",
+  port: Number(process.env.REDIS_PORT) || 6379,
 });
 
 const interviewQueue = new Queue("interview-queue", { connection });

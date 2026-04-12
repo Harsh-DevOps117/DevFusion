@@ -10,10 +10,10 @@ dotenv.config({
 });
 
 const openai = new OpenAI();
-const connection = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  { maxRetriesPerRequest: null },
-);
+const connection = new Redis({
+  host: process.env.REDIS_HOST || "redis",
+  port: Number(process.env.REDIS_PORT) || 6379,
+});
 
 export const resumeWorker = new Worker(
   "resume-analysis",
