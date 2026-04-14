@@ -6,7 +6,11 @@ let io: SocketIOServer | null = null;
 export const initSocket = (httpServer: HTTPServer) => {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "http://localhost:5173",
+      origin:[
+	      "http://localhost:5173",
+	      "https://prepgrid.in",
+              "https://prepgrid-pearl.vercel.app"
+      ],
       credentials: true,
     },
   });

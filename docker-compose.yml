@@ -5,6 +5,9 @@ services:
     restart: always
     ports:
       - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://postgres:strongpassword@db:5432/postgres
+      REDIS_URL: redis://redis:6379
     env_file:
       - .env
     depends_on:

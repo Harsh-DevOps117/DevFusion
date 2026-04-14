@@ -1,3 +1,4 @@
+//re
 import dotenv from "dotenv";
 import type { Request, Response } from "express";
 import Redis from "ioredis";
@@ -46,6 +47,7 @@ export const getQuiz = async (req: Request, res: Response) => {
             question: true,
             options: true,
             order: true,
+            // Notice: correctAnswer and explanation are intentionally left out to prevent cheating
           },
         },
       },
@@ -71,19 +73,29 @@ export const submitQuiz = async (req: Request, res: Response) => {
   const userId = req.user?.id as string;
 
   try {
+    // 1. Fetch ALL fields for the questions so we can send them back to the frontend
+    // We removed the 'select' restriction here so it grabs correctAnswer and explanation
     const questions = await prisma.quizQuestion.findMany({
       where: { quizId },
-      select: { id: true, correctAnswer: true },
+      orderBy: { order: "asc" }
     });
 
     let correctCount = 0;
+    
+    // 2. Calculate Score using robust string matching
     questions.forEach((q) => {
       const userAns = answers.find((a: any) => a.questionId === q.id);
-      if (userAns?.selected === q.correctAnswer) correctCount++;
+      if (
+        userAns &&
+        String(userAns.selected).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()
+      ) {
+        correctCount++;
+      }
     });
 
     const score = (correctCount / questions.length) * 100;
 
+    // 3. Save the attempt
     const result = await prisma.$transaction(async (tx) => {
       const lastAttempt = await tx.quizAttempt.findFirst({
         where: { userId, quizId },
@@ -107,9 +119,11 @@ export const submitQuiz = async (req: Request, res: Response) => {
       });
     });
 
+    // 4. Return the response including the full questions array
     return sendResponse(res, 201, true, "Quiz submitted", {
       attemptId: result.id,
       score,
+      questions, // <-- This passes the correct answers back to your React component
     });
   } catch (error: any) {
     return sendResponse(res, 500, false, "Submission failed", error.message);
