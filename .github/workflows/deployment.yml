@@ -18,9 +18,11 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: 📦 Build Project
+      - name: 📦 Install & Build
+        # Using --legacy-peer-deps to handle the mem0ai/pg version conflict
         run: |
-          npm ci
+          npm install --legacy-peer-deps
+          npx prisma generate
           npm run build
 
       - name: 🚀 Deploy via SSH
@@ -31,16 +33,31 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/prepgrid
+
+            echo "📥 Pulling latest code..."
             git pull origin main
-            npm install
+
+            echo "📦 Installing dependencies on server..."
+            # Ensuring the server also ignores peer-dep conflicts
+            npm install --legacy-peer-deps
+
+            echo "💎 Generating Prisma Client..."
+            npx prisma generate
+
+            echo "🏗️ Building project..."
             npm run build
-            # Using PM2 to restart the process
+
+            echo "🔄 Restarting Service with PM2..."
+            # Restarts the app, or starts it if it's the first time
             pm2 restart prepgrid-backend || pm2 start dist/index.js --name prepgrid-backend
 
+            echo "✅ Deployment Successful!"
+
       - name: 📧 Send Email Notification
-        if: always() # Sends email even if the build fails so you know!
+        if: always()
         run: |
           STATUS="${{ job.status }}"
+          # Assign color: Green for success, Red for failure
           COLOR="#28a745"
           if [ "$STATUS" != "success" ]; then COLOR="#dc3545"; fi
 
@@ -48,8 +65,8 @@ jobs:
           -H "Authorization: Bearer ${{ secrets.MAILERSEND_API_KEY }}" \
           -H "Content-Type: application/json" \
           -d "{
-            \"from\": {\"email\": \"deploy@prepgrid.in\", \"name\": \"PrepGrid CI/CD\"},
+            \"from\": {\"email\": \"MS_vA9YNo@trial-351g071z6x34z65k.mlsender.net\", \"name\": \"PrepGrid CI/CD\"},
             \"to\": [{\"email\": \"8707460911har@gmail.com\"}],
             \"subject\": \"Deployment $STATUS: PrepGrid\",
-            \"html\": \"<h2 style='color:$COLOR'>Build $STATUS</h2><p>The latest update to <b>PrepGrid</b> has finished.</p><p><b>Commit:</b> ${{ github.event.head_commit.message }}<br><b>User:</b> ${{ github.actor }}</p><a href='https://prepgrid.in'>Visit Website</a>\"
+            \"html\": \"<div style='font-family:sans-serif; padding:20px; border:1px solid #eee;'><h2 style='color:$COLOR'>Build $STATUS</h2><p>The latest update to <b>PrepGrid</b> has finished.</p><p><b>Commit Message:</b> ${{ github.event.head_commit.message }}<br><b>Triggered By:</b> ${{ github.actor }}</p><hr/><a href='https://prepgrid.in' style='background:$COLOR; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;'>Visit PrepGrid.in</a></div>\"
           }"

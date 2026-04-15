@@ -61,8 +61,9 @@ function createLimiter(opts: {
       req.ip ||
       "unknown",
     store: new RedisStore({
-      sendCommand: (...args: string[]) => redisClient.call(...args) as any,
-      prefix: opts.keyPrefix,
+      sendCommand: (...args: string[]) => {
+        return redisClient.call(args[0], ...args.slice(1)) as any;
+      },
     }),
     handler: (_req, res) => {
       res.status(429).json({
