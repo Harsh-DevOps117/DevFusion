@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { executeCode } from "../controller/executeCodeController";
-import { isAuthenticated } from "../middleware/authMiddleware";
+ 
+import {checkUsage} from "../middleware/checkUsage"
+
 
 const router=Router()
 
 
-router.post("/execute-code",executeCode)
+router.post("/execute-code",checkUsage,executeCode)
 
 export default router

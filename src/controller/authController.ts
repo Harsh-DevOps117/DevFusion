@@ -280,3 +280,25 @@ export const getAdminStats = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+export const getUserActivity = async (req:Request, res:Response) => {
+  const userId = req.user?.id;
+
+  const data = await prisma.problemSolved.findMany({
+    where: { userId },
+    select: { createdAt: true },
+  });
+
+   
+  const map = {};
+  console.log(data)
+
+  data.forEach((item) => {
+    const date = item.createdAt.toISOString().split("T")[0];
+
+    map[date] = (map[date] || 0) + 1;
+  });
+
+  return res.json({ activity: map });
+};

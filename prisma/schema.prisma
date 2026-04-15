@@ -48,6 +48,7 @@ model User {
   role          UserRole  @default(USER)
   password      String
   plan          Plan      @default(FREE)
+  credits       Int       @default(3)
 
   currentStreak Int       @default(0)
   lastActive    DateTime?
@@ -63,6 +64,7 @@ model User {
   payments      Payment[]
   subscription  Subscription?
   quizzes       Quiz[]
+
 
   @@index([email])
 }

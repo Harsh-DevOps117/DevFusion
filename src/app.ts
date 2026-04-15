@@ -151,8 +151,7 @@ const httpRequestDuration = new client.Histogram({
 register.registerMetric(httpRequestCounter);
 register.registerMetric(httpRequestDuration);
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
-const allowedOrigins = ["https://prepgrid-pearl.vercel.app"];
+const allowedOrigins = ['https://prepgrid-pearl.vercel.app','http://localhost:5173'];
 
 app.use(
   cors({
