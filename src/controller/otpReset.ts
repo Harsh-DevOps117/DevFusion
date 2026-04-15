@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { EmailParams, MailerSend, Recipient, Sender } from "mailersend";
 import { prisma } from "../utils/prismaAdapter";
 import redisClient from "../utils/redisClient";
+import bcrypt from "bcryptjs";
 
 const mailerSend = new MailerSend({ apiKey: process.env.MAILERSEND_API_KEY! });
 
@@ -26,9 +27,9 @@ export const sendOTP = async (req: Request, res: Response) => {
     });
 
     const sentFrom = new Sender(
-      "MS_1o4Tap@test-r6ke4n1qeymgon12.mlsender.net",
-      "PrepGrid Support",
-    );
+  "noreply@test-nrw7gym0pn2g2k8e.mlsender.net",
+  "PrepGrid Support",
+);
     const recipients = [new Recipient(email, user.name || "Developer")];
     const emailParams = new EmailParams()
       .setFrom(sentFrom)
@@ -78,11 +79,14 @@ export const verifyOTPAndReset = async (req: Request, res: Response) => {
     });
   }
   // If valid, update Prisma and clear cache
-  // (Assuming you've hashed the password here)
-  await prisma.user.update({
+  const pepper = process.env.PEPPER || "";
+
+  const hashedPassword = await bcrypt.hash(newPassword + pepper, 10);
+  const user=await prisma.user.update({
     where: { email },
-    data: { password: newPassword },
+    data: { password: hashedPassword },
   });
+  console.log("done",user)
 
   await redisClient.del(`otp:${email}`);
 

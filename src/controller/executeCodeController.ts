@@ -6,6 +6,7 @@ import {
 } from "../utils/judge0";
 import logger from "../utils/logger";
 import { prisma } from "../utils/prismaAdapter";
+import { updateStreak } from "../utils/streak";
 
 export const executeCode = async (req: Request, res: Response) => {
   try {
@@ -119,6 +120,7 @@ export const executeCode = async (req: Request, res: Response) => {
           problemId,
         },
       });
+      await updateStreak(userId);
     }
 
     const testCaseResults = detailedResults.map((r) => ({
@@ -147,6 +149,7 @@ export const executeCode = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error("Execution Error:", error.message);
+    console.log(error)
     return res.status(500).json({
       error: "Failed to execute code",
     });

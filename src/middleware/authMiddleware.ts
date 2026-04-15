@@ -10,7 +10,7 @@ export const isAuthenticated = async (
 ) => {
   try {
     const secret = process.env.JWT_SECRET;
-    console.log("hit")
+    console.log("secret:",secret)
 
     if (!secret) {
       console.error("AUTH_ERROR: JWT secrets are missing in .env");
