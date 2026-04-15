@@ -1,0 +1,55 @@
+name: PrepGrid Auto Deploy
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 📦 Build Project
+        run: |
+          npm ci
+          npm run build
+
+      - name: 🚀 Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/prepgrid
+            git pull origin main
+            npm install
+            npm run build
+            # Using PM2 to restart the process
+            pm2 restart prepgrid-backend || pm2 start dist/index.js --name prepgrid-backend
+
+      - name: 📧 Send Email Notification
+        if: always() # Sends email even if the build fails so you know!
+        run: |
+          STATUS="${{ job.status }}"
+          COLOR="#28a745"
+          if [ "$STATUS" != "success" ]; then COLOR="#dc3545"; fi
+
+          curl -X POST "https://api.mailersend.com/v1/email" \
+          -H "Authorization: Bearer ${{ secrets.MAILERSEND_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"from\": {\"email\": \"deploy@prepgrid.in\", \"name\": \"PrepGrid CI/CD\"},
+            \"to\": [{\"email\": \"8707460911har@gmail.com\"}],
+            \"subject\": \"Deployment $STATUS: PrepGrid\",
+            \"html\": \"<h2 style='color:$COLOR'>Build $STATUS</h2><p>The latest update to <b>PrepGrid</b> has finished.</p><p><b>Commit:</b> ${{ github.event.head_commit.message }}<br><b>User:</b> ${{ github.actor }}</p><a href='https://prepgrid.in'>Visit Website</a>\"
+          }"

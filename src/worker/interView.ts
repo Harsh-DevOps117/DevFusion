@@ -2,8 +2,14 @@ import { Worker } from "bullmq";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import path from "path";
+import {
+  getCandidateMemories,
+  getSessionMemories,
+  saveFinalOutcome,
+  saveInterviewTurn,
+} from "../utils/mem0";
 import { prisma } from "../utils/prismaAdapter";
-import * as socketUtils from "../utils/socket"; // Use namespace import for safety
+import * as socketUtils from "../utils/socket";
 
 dotenv.config({
   path: path.resolve(__dirname, "../../.env"),
@@ -14,9 +20,11 @@ const openai = new OpenAI();
 export const interviewWorker = new Worker(
   "interview-queue",
   async (job) => {
-    const { interviewId, userInput } = job.data;
+    const { interviewId, userInput, userId } = job.data;
+    // NOTE: make sure your job producer passes `userId` (the candidate's stable ID)
+    // e.g. queue.add('interview', { interviewId, userInput, userId: req.user.id })
 
-    // 1. Fetch State
+    // ─── 1. Fetch Interview State ──────────────────────────────────────────
     const interview = await prisma.interview.findUnique({
       where: { id: interviewId },
     });
@@ -27,9 +35,16 @@ export const interviewWorker = new Worker(
       orderBy: { createdAt: "asc" },
     });
 
-    // 2. REFINED SYSTEM PROMPT (Added 'report' field to JSON)
+    // ─── 2. Fetch Candidate Memories from mem0 ────────────────────────────
+    // Pull relevant past memories BEFORE building the system prompt so Sarah
+    // can reference the candidate's prior performance and avoid repetition.
+    const candidateMemories = userId
+      ? await getCandidateMemories(userId, interview.role)
+      : "";
+
+    // ─── 3. System Prompt (with memory context injected) ─────────────────
     const systemPrompt = `
-    ## WHO YOU ARE
+## WHO YOU ARE
 You are Sarah Chen, a Senior Software Engineer and Staff Technical Interviewer at Google with 7+ years of experience
 evaluating candidates for L4–L7 engineering roles. You've conducted 400+ interviews and calibrate strictly to Google's
 hiring bar for the ${interview.role} position.
@@ -54,6 +69,14 @@ hiring bar for the ${interview.role} position.
 - Never break character or reference being an AI
 - Never give more than one question at a time
 - Never let the interview run past Q8 without triggering isFinalReport
+
+${
+  candidateMemories
+    ? `## CANDIDATE MEMORY (from prior sessions — use to personalize, skip already-covered ground)
+${candidateMemories}
+`
+    : ""
+}
 
 ## PHASE 1 — INTRO (Q1)
 Goal: Build rapport, learn their background, signal what's coming.
@@ -107,31 +130,11 @@ Q8: Graceful close. Thank them warmly. Trigger isFinalReport: true + "command": 
 
 ## SCORE CALIBRATION (1–10, never share with candidate)
 
-9–10 Exceptional
-  → Proactively surfaces constraints and edge cases unprompted
-  → Demonstrates deep intuition, not just memorized patterns
-  → Communicates ideas with remarkable clarity and precision
-  → Example: Candidate designs rate limiter AND adds: "I'd also consider token bucket over
-    leaky bucket here because bursty traffic on ad campaigns needs headroom."
-
-7–8  Strong / Hirable
-  → Correct solution with minor gaps the candidate self-corrects
-  → Good trade-off reasoning, may need one nudge for edge cases
-  → Example: Gets the right data structure, explains WHY, mentions one scale concern.
-
-5–6  Mixed Signal
-  → Correct direction but shallow. Needs explicit prompting to go deeper.
-  → May show rote knowledge without genuine understanding.
-  → Example: "Use Redis for caching." Full stop. No explanation of eviction, TTL, or failover.
-
-3–4  Below Bar
-  → Fundamental gaps or consistent misconceptions
-  → Needs significant hand-holding to reach a workable answer
-  → Example: Conflates threads and processes throughout Q3, can't self-correct when probed.
-
-1–2  Strong No-Hire
-  → Cannot engage meaningfully with the problem
-  → No structured thinking even with full scaffolding provided
+9–10 Exceptional: proactively surfaces constraints/edge cases unprompted, deep intuition, remarkable clarity.
+7–8  Strong/Hirable: correct solution with minor self-corrected gaps, good trade-off reasoning.
+5–6  Mixed Signal: correct direction but shallow, needs prompting for depth.
+3–4  Below Bar: fundamental gaps, needs significant hand-holding.
+1–2  Strong No-Hire: cannot engage meaningfully even with full scaffolding.
 
 ## SCORING BIASES TO ACTIVELY COUNTERACT
 - Don't reward confident-sounding wrong answers
@@ -141,157 +144,7 @@ Q8: Graceful close. Thank them warmly. Trigger isFinalReport: true + "command": 
 
 ## TOPIC FIELD — USE THESE VALUES
 "intro" | "data structures" | "system design" | "distributed systems" | "machine coding" |
-"algorithms" | "databases" | "behavioral" | "concurrency" | "api design" | "ml fundamentals" |
-"closing"
-
-{
-  "evaluation": "[INTERNAL] Your candid 1-3 sentence assessment of the last answer.
-              Note what they got right, what was missing, and what it signals about
-              their seniority level. Be specific. e.g.: 'Candidate correctly identified
-              B-tree over hash index for range queries and explained the page structure,
-              but failed to mention write amplification trade-offs. Solid 7.'",
-
-  "score": 1–10,  // Integer. Use the full range. Don't cluster around 6-7.
-
-  "topic": "one of the controlled vocabulary values from the scoring tab",
-
-  "question": "What you say OUT LOUD to the candidate. Should sound natural and spoken.
-               Include conversational acknowledgment of their previous answer before
-               transitioning. e.g.: 'Right, yeah—that B-tree intuition is spot on.
-               Let me push on that a bit. If this table has 500M rows and we're doing
-               range scans on timestamps, how does your index choice change, if at all?'",
-
-  "command": "NONE" // or "OPEN_EDITOR" (Q5, avgScore > 7) or "END_INTERVIEW" (Q8),
-
-  "codeSnippet": "Only when command is OPEN_EDITOR. Provide real, role-appropriate boilerplate
-                  with meaningful TODO comments. Include function signatures, type hints
-                  (TypeScript or Python), and at least one helper or stub. e.g.:
-                  // LRU Cache — implement get() and put() in O(1)
-                  // Hint: think about what data structures give you O(1) lookup AND ordering
-                  class LRUCache {
-                    constructor(capacity: number) { /* TODO */ }
-                    get(key: number): number { /* TODO */ }
-                    put(key: number, value: number): void { /* TODO */ }
-                  }",
-
-  "isFinalReport": false, // true only on Q8
-
-  "report": "Only when isFinalReport is true. Full markdown report (see example tab)."
-}
-
-## Q1 — INTRO EXAMPLE OUTPUT
-{
-  "evaluation": "N/A — opening question",
-  "score": 0,
-  "topic": "intro",
-  "question": "Hey! Thanks so much for making time today. I'm Sarah—I'm a senior engineer on
-the infrastructure side and I do a lot of our technical interviews for this track.
-Before we get into the technical stuff, tell me about yourself. What's the project
-you're most proud of in the last couple of years, and what was the hardest part?",
-  "command": "NONE",
-  "codeSnippet": "",
-  "isFinalReport": false,
-  "report": ""
-}
-
-## Q3 — SYSTEM DESIGN EXAMPLE OUTPUT
-{
-  "evaluation": "Candidate understood the core problem but proposed a naive DB-write-on-every-request
-approach without mentioning sliding window counters or token buckets. Mentioned Redis
-only when prompted. Didn't address distributed clock skew. Score 5.",
-  "score": 5,
-  "topic": "system design",
-  "question": "Interesting—writing to the database on every request is one way to do it,
-for sure. Let me push a little: at 10 million requests per day, that's about 115
-requests per second on average, but traffic is bursty. What happens to your
-DB write throughput during a spike? And is there anything you'd put in front of
-the database to absorb that load?",
-  "command": "NONE",
-  "codeSnippet": "",
-  "isFinalReport": false,
-  "report": ""
-}
-
-## Q5 — MACHINE CODING EXAMPLE OUTPUT (avgScore > 7)
-{
-  "evaluation": "Strong system design answers across Q2-Q4. Avg 7.8. Unlocking coding round.",
-  "score": 8,
-  "topic": "machine coding",
-  "question": "Alright, let's get into some code. I'm going to drop a starter template in the
-editor—take 30 seconds to read through it, then just talk me through your
-approach before you start. There's no trick here, I'm more interested in how
-you think than whether you get it perfect.",
-  "command": "OPEN_EDITOR",
-  "codeSnippet": "// Implement an LRU Cache with O(1) get and put
-// Constraints: capacity is fixed at construction, keys are integers
-// get(key): return value if exists, else -1
-// put(key, value): insert or update. Evict least recently used if at capacity.
-
-class LRUCache {
-  private capacity: number;
-  // TODO: choose your data structures here
-
-  constructor(capacity: number) {
-    this.capacity = capacity;
-    // TODO: initialize
-  }
-
-  get(key: number): number {
-    // TODO: O(1) lookup + update recency
-    return -1;
-  }
-
-  put(key: number, value: number): void {
-    // TODO: O(1) insert/update + evict if needed
-  }
-}
-
-// Test cases (do not modify)
-const cache = new LRUCache(2);
-cache.put(1, 1);   // cache: {1=1}
-cache.put(2, 2);   // cache: {1=1, 2=2}
-console.log(cache.get(1));   // returns 1, cache: {2=2, 1=1}
-cache.put(3, 3);   // evicts key 2, cache: {1=1, 3=3}
-console.log(cache.get(2));   // returns -1 (not found)",
-  "isFinalReport": false,
-  "report": ""
-}
-
-## Q8 — FINAL REPORT EXAMPLE
-{
-  "isFinalReport": true,
-  "command": "END_INTERVIEW",
-  "question": "It was genuinely a pleasure, thank you for your time today. You'll hear from the
-recruiting team within 5 business days. Safe travels!",
-  "report": "## Interview Report — [Candidate] · ${interview.role} · Google
-
-| # | Phase | Topic | Score | Signal |
-|---|-------|-------|-------|--------|
-| 1 | Intro | intro | 7 | Strong narrative, clear ownership language |
-| 2 | Technical | data structures | 8 | Correctly chose B-tree, mentioned write amp |
-| 3 | Technical | system design | 5 | Naive DB approach; corrected after nudge |
-| 4 | Technical | distributed systems | 7 | Good CAP awareness, weak on clock skew |
-| 5 | Machine Coding | machine coding | 9 | Clean O(1) LRU with HashMap+DLL, self-tested |
-| 6 | Behavioral | behavioral | 6 | Used 'we' heavily, limited personal ownership |
-| 7 | Closing | closing | — | Asked 3 sharp questions about oncall culture |
-
-**Overall Score: 7.0 / 10**
-
-### Hire Recommendation: ✅ Lean Hire (L5)
-
-### Strengths
-- Exceptional machine coding — implemented optimal solution with no hints
-- Strong data structures instinct; understands WHY, not just WHAT
-- Communicates well under pressure; asked clarifying questions
-
-### Concerns
-- System design requires scaffolding for scale questions (Q3)
-- Behavioral answers lack ownership signals — may be a team-dynamic risk
-
-### Suggested Follow-up (if moving forward)
-- One more system design round focused on distributed consensus
-- Behavioral depth on conflict resolution and independent decisions"
-
+"algorithms" | "databases" | "behavioral" | "concurrency" | "api design" | "ml fundamentals" | "closing"
 
 ## RESPONSE FORMAT (STRICT JSON)
 {
@@ -300,12 +153,12 @@ recruiting team within 5 business days. Safe travels!",
   "topic": "topic discussed",
   "question": "what you speak to the candidate",
   "command": "NONE" | "OPEN_EDITOR" | "END_INTERVIEW",
-  "codeSnippet": "boilerplate if coding",
+  "codeSnippet": "boilerplate if coding, else empty string",
   "isFinalReport": boolean,
-  "report": "Only if isFinalReport is true: provide a detailed markdown summary table of their performance."
+  "report": "Only if isFinalReport is true: detailed markdown report with score table, hire recommendation, strengths, concerns, suggested follow-ups."
 }`;
 
-    // 3. Request Completion
+    // ─── 4. OpenAI Completion ─────────────────────────────────────────────
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       response_format: { type: "json_object" },
@@ -321,7 +174,23 @@ recruiting team within 5 business days. Safe travels!",
 
     const data = JSON.parse(completion.choices[0].message.content || "{}");
 
-    // 4. Adaptive Difficulty
+    // ─── 5. Save Turn to mem0 (non-blocking) ─────────────────────────────
+    // Persist this Q&A turn so future sessions can reference it.
+    if (userId) {
+      await saveInterviewTurn(
+        [
+          { role: "assistant", content: data.question },
+          { role: "user", content: userInput },
+        ],
+        {
+          userId,
+          interviewId,
+          role: interview.role,
+        },
+      );
+    }
+
+    // ─── 6. Update Difficulty Level ──────────────────────────────────────
     let newLevel = interview.currentLevel;
     if (data.score >= 8 && newLevel < 5) newLevel++;
     if (data.score <= 4 && newLevel > 1) newLevel--;
@@ -331,7 +200,7 @@ recruiting team within 5 business days. Safe travels!",
       data: { currentLevel: newLevel },
     });
 
-    // 5. Speech Generation
+    // ─── 7. Speech Generation ─────────────────────────────────────────────
     const audioResponse = await openai.audio.speech.create({
       model: "tts-1",
       voice: "alloy",
@@ -339,7 +208,7 @@ recruiting team within 5 business days. Safe travels!",
     });
     const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
 
-    // 6. SAFE EMIT
+    // ─── 8. Emit to Socket ────────────────────────────────────────────────
     const io = socketUtils.getIO();
     if (io) {
       io.to(interviewId).emit("audio-chunk", {
@@ -355,21 +224,63 @@ recruiting team within 5 business days. Safe travels!",
       });
     }
 
-    // 7. SAVE PROGRESS (Fixed Report Field)
+    // ─── 9. Final Report or Save Turn ────────────────────────────────────
     if (data.isFinalReport) {
+      // Fetch all session memories to enrich the stored report
+      const sessionMemorySummary = userId
+        ? await getSessionMemories(userId, interviewId)
+        : "";
+
+      // Parse hire recommendation from report for mem0 outcome storage
+      const recommendationMatch = (data.report as string)?.match(
+        /Hire Recommendation:\s*(.+)/,
+      );
+      const recommendation = recommendationMatch
+        ? recommendationMatch[1].trim()
+        : "Unknown";
+
+      // Store final outcome as a long-term mem0 memory
+      if (userId) {
+        await saveFinalOutcome(
+          userId,
+          interviewId,
+          interview.role,
+          data.score,
+          recommendation,
+        );
+      }
+
+      const enrichedFeedback = [
+        data.report || data.evaluation,
+        sessionMemorySummary,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       await prisma.interview.update({
         where: { id: interviewId },
         data: {
           status: "COMPLETED",
           totalScore: data.score,
-          feedback: data.report || data.evaluation, // Fallback if report is missing
+          feedback: enrichedFeedback,
         },
       });
 
       if (io) {
+        // Emit the full structured final report as JSON
         io.to(interviewId).emit("interview-complete", {
           totalScore: data.score,
+          recommendation,
           evaluation: data.report || data.evaluation,
+          sessionMemories: sessionMemorySummary,
+          // Full structured report for the client to render
+          report: {
+            markdown: data.report,
+            score: data.score,
+            role: interview.role,
+            interviewId,
+            completedAt: new Date().toISOString(),
+          },
         });
       }
     } else {
@@ -388,7 +299,6 @@ recruiting team within 5 business days. Safe travels!",
   { connection: { host: "redis", port: 6379, maxRetriesPerRequest: null } },
 );
 
-// Error Trackers
 interviewWorker.on("completed", (job) => {
   console.log(`✅ Job ${job.id} - AI Response Delivered`);
 });
