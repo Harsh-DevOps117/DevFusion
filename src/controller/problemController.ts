@@ -6,6 +6,12 @@ import {
 } from "../utils/judge0";
 import logger from "../utils/logger";
 import { prisma } from "../utils/prismaAdapter";
+import { success } from "zod";
+import Redis from "ioredis";
+
+const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379", {
+  maxRetriesPerRequest: null,
+});
 
 export const createProblem = async (req: Request, res: Response) => {
   const {
@@ -131,7 +137,8 @@ export const createProblem = async (req: Request, res: Response) => {
         userId,
       },
     });
-
+     
+    await redis.del("problems:all");
     return res.status(201).json({
       success: true,
       message: "Problem created successfully",
@@ -144,14 +151,27 @@ export const createProblem = async (req: Request, res: Response) => {
 };
 
 export const getAllProblems = async (req: Request, res: Response) => {
+  const cacheKey = "problems:all";
+
   try {
-    const problems = await prisma.problem.findMany();
-    if (!problems) {
-      return res.status(404).json({ error: "No problem found" });
+     const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        message: "Problems fetched (Cache)",
+        problems: JSON.parse(cached),
+      });
     }
-    res.status(200).json({
+
+    const problems = await prisma.problem.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    await redis.setex(cacheKey, 3600, JSON.stringify(problems));
+
+    return res.status(200).json({
       success: true,
-      message: "Problems fetched successfully",
+      message: "Problems fetched (DB)",
       problems,
     });
   } catch (error) {
@@ -215,3 +235,36 @@ export const getAllProblemSolvedByUser = async (
     res.status(500).json({ error: "failed to fetch problems" });
   }
 };
+
+export const deleteProblemById=async (req:Request,res:Response)=>{
+ try {
+   const {id} =req.params
+  if(typeof(id)!="string"){
+    return res.status(401).json({
+      message:"invalid id"
+    })
+  }
+
+  const problem=await prisma.problem.delete({
+    where:{
+      id:id
+    }
+  })
+
+  if(!problem){
+    return res.status(404).json({
+      message:"problem not found"
+    })
+  }
+  await redis.del("problems:all");
+
+  res.status(200).json({
+    message:"Problem deleted"
+  })
+ } catch (error) {
+  console.log(error)
+  res.status(500).json({
+    message:"internal server error"
+  })
+ }
+}
