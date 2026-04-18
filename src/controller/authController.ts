@@ -282,16 +282,19 @@ export const getAdminStats = async (req: Request, res: Response) => {
 };
 
 
-export const getUserActivity = async (req:Request, res:Response) => {
+export const getUserActivity = async (req: Request, res: Response) => {
   const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   const data = await prisma.problemSolved.findMany({
     where: { userId },
     select: { createdAt: true },
   });
 
-   
-  const map = {};
+
+  const map: Record<string, number> = {};
   console.log(data)
 
   data.forEach((item) => {
