@@ -296,7 +296,7 @@ Q8: Graceful close. Thank them warmly. Trigger isFinalReport: true + "command": 
       });
     }
   },
-  { connection: { host: process.env.REDIS_HOST|"redis", port: 6379, maxRetriesPerRequest: null } },
+  { connection: { host: process.env.REDIS_HOST||"redis", port: 6379, maxRetriesPerRequest: null } },
 );
 
 interviewWorker.on("completed", (job) => {

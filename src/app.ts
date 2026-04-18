@@ -29,10 +29,9 @@ import routeSubmission from "./routes/submissionRoutes";
 import userRoute from "./routes/userRoute";
 import { initSocket } from "./utils/socket";
 
-// ─── Rate Limiters ────────────────────────────────────────────────────────────
-import rateLimit from "express-rate-limit";
+ 
 import Redis from "ioredis";
-import RedisStore from "rate-limit-redis";
+ 
 
 dotenv.config();
 
@@ -43,86 +42,6 @@ const redisClient = new Redis({
   maxRetriesPerRequest: null,
 });
 
-// ─── Limiter factory ──────────────────────────────────────────────────────────
-function createLimiter(opts: {
-  windowMs: number;
-  max: number;
-  message: string;
-  keyPrefix: string;
-}) {
-  return rateLimit({
-    windowMs: opts.windowMs,
-    max: opts.max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    // use real IP even behind nginx / vercel proxy
-    keyGenerator: (req) =>
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-      req.ip ||
-      "unknown",
-    store: new RedisStore({
-      sendCommand: (...args: string[]) => {
-        return redisClient.call(args[0], ...args.slice(1)) as any;
-      },
-    }),
-    handler: (_req, res) => {
-      res.status(429).json({
-        success: false,
-        error: opts.message,
-        retryAfter: Math.ceil(opts.windowMs / 1000),
-      });
-    },
-  });
-}
-
-// 100 req / 15 min  — broad API protection
-const apiLimiter = createLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests. Please try again in 15 minutes.",
-  keyPrefix: "rl:api:",
-});
-
-// 10 req / 15 min  — brute-force protection on auth
-const authLimiter = createLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: "Too many auth attempts. Please try again in 15 minutes.",
-  keyPrefix: "rl:auth:",
-});
-
-// 5 req / hour  — expensive OpenAI call
-const quizGenerationLimiter = createLimiter({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  message:
-    "Quiz generation limit reached. You can generate 5 quizzes per hour.",
-  keyPrefix: "rl:quiz:",
-});
-
-// 3 req / hour  — interview session is heaviest resource
-const interviewLimiter = createLimiter({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  message: "Interview limit reached. You can start 3 interviews per hour.",
-  keyPrefix: "rl:interview:",
-});
-
-// 10 req / hour  — resume review (OpenAI + S3)
-const resumeLimiter = createLimiter({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  message: "Resume review limit reached. Try again in an hour.",
-  keyPrefix: "rl:resume:",
-});
-
-// 20 req / min  — code execution (sandboxed but still expensive)
-const codeExecutionLimiter = createLimiter({
-  windowMs: 60 * 1000,
-  max: 20,
-  message: "Code execution limit reached. Max 20 runs per minute.",
-  keyPrefix: "rl:code:",
-});
 
 // ─── App bootstrap ────────────────────────────────────────────────────────────
 const app: Application = express();
@@ -230,39 +149,20 @@ io.on("connection", (socket) => {
     logger.info(`User joined interview room: ${interviewId}`);
   });
 });
+app.use("/v1", routesAuth);
+app.use("/v1", getLeaderboard);
 
-// ─── Routes with rate limiting ────────────────────────────────────────────────
+app.use("/v1/quiz/generate", isAuthenticated, quizRoutes);
+app.use("/v1/interview/start", isAuthenticated, interviewRoutes);
+app.use("/v1/resume", isAuthenticated, resumeReviewer);
+app.use("/v1", isAuthenticated, routeExecuteCode);
 
-// Auth — tight limit, no auth middleware needed
-app.use("/v1", authLimiter, routesAuth);
-
-// Leaderboard — public, covered by global apiLimiter
-app.use("/v1", apiLimiter, getLeaderboard);
-
-// AI-heavy routes — strictest limits, must be BEFORE the generic apiLimiter
-app.use(
-  "/v1/quiz/generate",
-  isAuthenticated,
-  quizGenerationLimiter,
-  quizRoutes,
-);
-app.use(
-  "/v1/interview/start",
-  isAuthenticated,
-  interviewLimiter,
-  interviewRoutes,
-);
-app.use("/v1/resume", isAuthenticated, resumeLimiter, resumeReviewer);
-app.use("/v1", isAuthenticated, codeExecutionLimiter, routeExecuteCode);
-
-// Standard authenticated routes — general API limit
-app.use("/v1", isAuthenticated, apiLimiter, quizAttempt);
-app.use("/v1/problem", isAuthenticated, apiLimiter, routesProblem);
-app.use("/v1/playlist", isAuthenticated, apiLimiter, routesPlaylist);
-app.use("/v1", isAuthenticated, apiLimiter, routeSubmission);
-app.use("/v1", isAuthenticated, apiLimiter, paymentRoutes);
-app.use("/v1/user", isAuthenticated, apiLimiter, userRoute);
-
+app.use("/v1", isAuthenticated, quizAttempt);
+app.use("/v1/problem", isAuthenticated, routesProblem);
+app.use("/v1/playlist", isAuthenticated, routesPlaylist);
+app.use("/v1", isAuthenticated, routeSubmission);
+app.use("/v1", isAuthenticated, paymentRoutes);
+app.use("/v1/user", isAuthenticated, userRoute);
 // ─── Server start ─────────────────────────────────────────────────────────────
 httpServer.listen(process.env.PORT, () => {
   logger.info(`Server is running on port ${process.env.PORT}`);
