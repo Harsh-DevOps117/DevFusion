@@ -55,6 +55,7 @@ function createLimiter(opts: {
     max: opts.max,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
     // use real IP even behind nginx / vercel proxy
     keyGenerator: (req) =>
       (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
@@ -151,7 +152,7 @@ const httpRequestDuration = new client.Histogram({
 register.registerMetric(httpRequestCounter);
 register.registerMetric(httpRequestDuration);
 
-const allowedOrigins = ['https://prepgrid-pearl.vercel.app','http://localhost:5173'];
+const allowedOrigins = ['https://prepgrid-pearl.vercel.app', 'http://localhost:5173', 'http://3.88.176.124:5173'];
 
 app.use(
   cors({
