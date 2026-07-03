@@ -2,8 +2,12 @@ import { Queue } from "bullmq";
 import { Request, Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
+import { redisOptions } from "../config/redisConfig";
 
-const connection = new Redis(process.env.REDIS_URL || "redis://redis:6379");
+const connection = new Redis({
+  ...redisOptions,
+  maxRetriesPerRequest: null,
+});
 
 const interviewQueue = new Queue("interview-queue", { connection });
 

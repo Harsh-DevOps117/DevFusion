@@ -8,8 +8,10 @@ import logger from "../utils/logger";
 import { prisma } from "../utils/prismaAdapter";
 import { success } from "zod";
 import Redis from "ioredis";
+import { redisOptions } from "../config/redisConfig";
 
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379", {
+const redis = new Redis({
+  ...redisOptions,
   maxRetriesPerRequest: null,
 });
 

@@ -1,5 +1,7 @@
 import Redis from "ioredis";
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
+import { redisOptions } from "../config/redisConfig";
+
+const redis = new Redis(redisOptions as any);
 
 export const clearUserCache = async (userId: string) => {
   await redis.del(`user:profile:${userId}`);

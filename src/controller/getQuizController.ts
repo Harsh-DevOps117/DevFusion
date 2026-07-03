@@ -3,10 +3,12 @@ import dotenv from "dotenv";
 import type { Request, Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
+import { redisOptions } from "../config/redisConfig";
 
 dotenv.config();
 
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379", {
+const redis = new Redis({
+  ...redisOptions,
   maxRetriesPerRequest: null,
 });
 

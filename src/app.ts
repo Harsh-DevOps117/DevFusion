@@ -33,13 +33,13 @@ import { initSocket } from "./utils/socket";
 import rateLimit from "express-rate-limit";
 import Redis from "ioredis";
 import RedisStore from "rate-limit-redis";
+import { redisOptions } from "./config/redisConfig";
 
 dotenv.config();
 
 // ─── Redis client (shared with BullMQ) ───────────────────────────────────────
 const redisClient = new Redis({
-  host: process.env.REDIS_HOST || "redis",
-  port: Number(process.env.REDIS_PORT) || 6379,
+  ...redisOptions,
   maxRetriesPerRequest: null,
 });
 

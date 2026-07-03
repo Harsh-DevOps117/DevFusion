@@ -1,7 +1,11 @@
 import { createClient, RedisClientType } from "redis";
+import { redisOptions } from "../config/redisConfig";
 
 const redisClient: RedisClientType = createClient({
-  url: process.env.REDIS_URL || "redis://redis:6379",
+  socket: {
+    host: redisOptions.host,
+    port: redisOptions.port
+  }
 });
 
 // new Redis(process.env.REDIS_URL || "redis://redis:6379");

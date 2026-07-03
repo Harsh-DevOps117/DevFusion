@@ -1,8 +1,9 @@
 import { Response } from "express";
 import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
+import { redisOptions } from "../config/redisConfig";
 
-const redis = new Redis(process.env.REDIS_URL || "redis://redis:6379");
+const redis = new Redis(redisOptions);
 
 export const getUserFullProfile = async (req: any, res: Response) => {
   try {

@@ -10,9 +10,9 @@ dotenv.config({
 });
 
 const openai = new OpenAI();
+import { redisOptions } from "../config/redisConfig";
 const connection = new Redis({
-  host: process.env.REDIS_HOST || "redis",
-  port: Number(process.env.REDIS_PORT) || 6379,
+  ...redisOptions,
   maxRetriesPerRequest: null,
 });
 
