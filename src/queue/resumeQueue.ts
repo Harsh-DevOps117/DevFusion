@@ -2,13 +2,8 @@ import { Queue } from "bullmq";
 import Redis from "ioredis";
 import { redisOptions } from "../config/redisConfig";
 
-const connection = new Redis({
-  ...redisOptions,
-  maxRetriesPerRequest: null,
-});
-
 export const resumeQueue = new Queue("resume-analysis", {
-  connection,
+  connection: redisOptions,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

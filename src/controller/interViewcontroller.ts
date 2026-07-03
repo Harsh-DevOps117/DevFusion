@@ -4,12 +4,7 @@ import Redis from "ioredis";
 import { prisma } from "../utils/prismaAdapter";
 import { redisOptions } from "../config/redisConfig";
 
-const connection = new Redis({
-  ...redisOptions,
-  maxRetriesPerRequest: null,
-});
-
-const interviewQueue = new Queue("interview-queue", { connection });
+const interviewQueue = new Queue("interview-queue", { connection: redisOptions });
 
 export const handleUserResponse = async (req: Request, res: Response) => {
   const { interviewId, userInput } = req.body;

@@ -11,10 +11,6 @@ dotenv.config({
 
 const openai = new OpenAI();
 import { redisOptions } from "../config/redisConfig";
-const connection = new Redis({
-  ...redisOptions,
-  maxRetriesPerRequest: null,
-});
 
 export const resumeWorker = new Worker(
   "resume-analysis",
@@ -95,7 +91,7 @@ export const resumeWorker = new Worker(
     }
   },
   {
-    connection,
+    connection: redisOptions,
     concurrency: 5,
     removeOnComplete: { count: 50 },
     removeOnFail: { count: 100 },

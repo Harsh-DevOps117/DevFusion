@@ -20,10 +20,6 @@ console.log("🧑‍💼 Quiz Worker started...");
 
 const openai = new OpenAI();
 import { redisOptions } from "../config/redisConfig";
-const connection = new Redis({
-  ...redisOptions,
-  maxRetriesPerRequest: null,
-});
 
 // ─── Prompt Builder ───────────────────────────────────────────────────────────
 
@@ -194,7 +190,7 @@ const worker = new Worker(
 
     return { quizId: quiz.id };
   },
-  { connection },
+  { connection: redisOptions },
 );
 
 // ─── Lifecycle Hooks ──────────────────────────────────────────────────────────

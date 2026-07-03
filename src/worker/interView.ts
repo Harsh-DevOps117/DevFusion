@@ -16,6 +16,7 @@ dotenv.config({
 });
 
 const openai = new OpenAI();
+import { redisOptions } from "../config/redisConfig";
 
 export const interviewWorker = new Worker(
   "interview-queue",
@@ -296,7 +297,7 @@ Q8: Graceful close. Thank them warmly. Trigger isFinalReport: true + "command": 
       });
     }
   },
-  { connection: { host: process.env.REDIS_HOST|"redis", port: 6379, maxRetriesPerRequest: null } },
+  { connection: redisOptions },
 );
 
 interviewWorker.on("completed", (job) => {
